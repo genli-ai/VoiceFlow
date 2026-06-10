@@ -147,6 +147,7 @@ final class DictationController {
         phase = .processing
         overlay.showProcessing("识别中…")
         let tStart = Date()
+        let isColdStart = !QwenEngine.shared.isModelReady
 
         QwenEngine.shared.transcribe(samples: samples) { [weak self] result in
             guard let self = self else { return }
@@ -179,26 +180,31 @@ final class DictationController {
                         let polishSeconds = Date().timeIntervalSince(tPolish)
                         let timing = String(format: "识别 %.1fs · 润色 %.1fs", asrSeconds, polishSeconds)
                         if let polished = polished {
-                            self.deliver(raw: rawText, final: polished, note: "已输入（\(timing)）")
+                            self.deliver(raw: rawText, final: polished, note: "已输入（\(timing)）",
+                                         allowClipboardRestore: !isColdStart)
                         } else {
                             self.deliver(raw: rawText, final: rawText,
                                          note: "润色失败（\(failure ?? "未知")），已输出识别原文",
-                                         warning: true)
+                                         warning: true,
+                                         allowClipboardRestore: !isColdStart)
                         }
                     }
                 } else {
                     let timing = String(format: "识别 %.1fs", asrSeconds)
-                    self.deliver(raw: rawText, final: rawText, note: "已输入（\(timing)）")
+                    self.deliver(raw: rawText, final: rawText, note: "已输入（\(timing)）",
+                                 allowClipboardRestore: !isColdStart)
                 }
             }
         }
     }
 
-    private func deliver(raw: String, final text: String, note: String, warning: Bool = false) {
+    private func deliver(raw: String, final text: String, note: String, warning: Bool = false,
+                         allowClipboardRestore: Bool = true) {
         let finalText = TextPostProcessor.fixMixedPunctuation(text)
         HistoryStore.shared.add(raw: raw, polished: finalText)
         phase = .idle
-        TextInserter.insert(finalText, targetBundleID: targetBundleID) { [weak self] outcome in
+        TextInserter.insert(finalText, targetBundleID: targetBundleID,
+                            allowClipboardRestore: allowClipboardRestore) { [weak self] outcome in
             guard let self = self else { return }
             switch outcome {
             case .pasted:

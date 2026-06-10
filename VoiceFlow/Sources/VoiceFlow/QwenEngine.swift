@@ -51,21 +51,40 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
     // 以下状态只在主线程读写
     private var loadTask: Task<Qwen3ASRSTT, Error>?
     private var loadedDirPath: String?
+    private var readyDirPath: String?
 
     var isModelLoaded: Bool { loadTask != nil }
+    var isModelReady: Bool {
+        let dir = modelDirectory.path
+        return loadTask != nil && loadedDirPath == dir && readyDirPath == dir
+    }
 
     /// 主线程调用：获取（或创建）模型加载任务，含 Metal 预热
     private func ensureLoadTask() -> Task<Qwen3ASRSTT, Error> {
         let dir = modelDirectory
+        let dirPath = dir.path
         if let task = loadTask, loadedDirPath == dir.path {
             return task
         }
         loadTask = nil
+        readyDirPath = nil
         let task = Task {
             try await Qwen3ASRSTT.loadWithWarmup(from: dir)
         }
         loadTask = task
-        loadedDirPath = dir.path
+        loadedDirPath = dirPath
+        Task { [weak self] in
+            do {
+                _ = try await task.value
+                guard let engine = self else { return }
+                await MainActor.run {
+                    guard engine.loadedDirPath == dirPath else { return }
+                    engine.readyDirPath = dirPath
+                }
+            } catch {
+                // transcribe() reports the concrete error and clears the failed task.
+            }
+        }
         return task
     }
 
@@ -94,6 +113,7 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
     func unloadModel() {
         loadTask = nil
         loadedDirPath = nil
+        readyDirPath = nil
         Qwen3ASRSTT.flushMemoryPool()
     }
 
@@ -129,9 +149,13 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
                 DispatchQueue.main.async { [weak self] in
                     self?.loadTask = nil
                     self?.loadedDirPath = nil
+                    self?.readyDirPath = nil
                     completion(.failure(VFError("Qwen 模型加载失败：\(String(message.prefix(120)))")))
                 }
                 return
+            }
+            await MainActor.run { [weak self] in
+                self?.readyDirPath = self?.loadedDirPath
             }
             // 第二步：识别。失败不影响已加载的模型
             do {

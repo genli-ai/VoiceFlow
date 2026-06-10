@@ -38,6 +38,10 @@ final class AudioRecorder {
         samples.removeAll()
         lock.unlock()
 
+        self.engine = engine
+        self.converter = converter
+        self.outFormat = outFormat
+
         input.installTap(onBus: 0, bufferSize: 4096, format: inFormat) { [weak self] buffer, _ in
             self?.process(buffer: buffer)
         }
@@ -47,12 +51,12 @@ final class AudioRecorder {
             try engine.start()
         } catch {
             input.removeTap(onBus: 0)
+            self.engine = nil
+            self.converter = nil
+            self.outFormat = nil
             throw VFError("无法启动录音：\(error.localizedDescription)")
         }
 
-        self.engine = engine
-        self.converter = converter
-        self.outFormat = outFormat
         isRecording = true
     }
 

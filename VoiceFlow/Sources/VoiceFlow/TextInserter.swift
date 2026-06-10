@@ -13,13 +13,15 @@ enum TextInserter {
     /// 如果用户在识别/润色期间切走了窗口，先把目标应用拉回前台、确认到位后再粘贴；
     /// 拉不回来就把文本留在剪贴板并告知用户。completion 在主线程回调。
     static func insert(_ text: String, targetBundleID: String = "",
+                       allowClipboardRestore: Bool = true,
                        completion: @escaping (Outcome) -> Void) {
         let frontID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
 
         // 焦点没动过：正常粘贴
         if targetBundleID.isEmpty || frontID == targetBundleID {
-            performPaste(text, allowRestore: true)
-            completion(.pasted)
+            performPaste(text, allowRestore: allowClipboardRestore) {
+                completion(.pasted)
+            }
             return
         }
 
@@ -30,14 +32,15 @@ enum TextInserter {
             completion(.clipboardOnly)
             return
         }
-        app.activate(options: [.activateIgnoringOtherApps])
+        app.activate(options: [])
         waitForFrontmost(targetBundleID, attemptsLeft: 8) { arrived in
             if arrived {
                 // 等一拍让焦点真正落到输入框，再粘贴；
                 // 风险路径不恢复剪贴板，万一没粘上用户还能 ⌘V
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    performPaste(text, allowRestore: false)
-                    completion(.pasted)
+                    performPaste(text, allowRestore: false) {
+                        completion(.pasted)
+                    }
                 }
             } else {
                 putOnClipboard(text)
@@ -68,7 +71,8 @@ enum TextInserter {
         pb.setString(text, forType: .string)
     }
 
-    private static func performPaste(_ text: String, allowRestore: Bool) {
+    private static func performPaste(_ text: String, allowRestore: Bool,
+                                     completion: (() -> Void)? = nil) {
         let pasteboard = NSPasteboard.general
         let oldString = pasteboard.string(forType: .string)
 
@@ -76,8 +80,10 @@ enum TextInserter {
         pasteboard.setString(text, forType: .string)
 
         // 给剪贴板写入留一点时间，再发送 ⌘V
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            sendCmdV()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            sendCmdV {
+                completion?()
+            }
             if allowRestore && Settings.shared.restoreClipboard {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     // 只有当剪贴板还是我们写入的内容时才恢复，避免覆盖用户新复制的东西
@@ -92,16 +98,20 @@ enum TextInserter {
         }
     }
 
-    private static func sendCmdV() {
+    private static func sendCmdV(completion: (() -> Void)? = nil) {
         let source = CGEventSource(stateID: .combinedSessionState)
         // 9 = kVK_ANSI_V
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else {
+            completion?()
             return
         }
         keyDown.flags = .maskCommand
         keyUp.flags = .maskCommand
         keyDown.post(tap: .cghidEventTap)
-        keyUp.post(tap: .cghidEventTap)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+            keyUp.post(tap: .cghidEventTap)
+            completion?()
+        }
     }
 }
