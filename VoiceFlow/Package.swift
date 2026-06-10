@@ -21,8 +21,9 @@ let package = Package(
             ],
             path: "Sources/VoiceFlow",
             swiftSettings: [
-                // 源码按 Swift 5 语言模式编译（避免 Swift 6 严格并发检查）
-                .unsafeFlags(["-swift-version", "5"])
+                // 源码按 Swift 5 语言模式编译（避免 Swift 6 严格并发检查）。
+                // unsafeFlags 写法在 xcodebuild 下不生效，必须用标准 API
+                .swiftLanguageMode(.v5)
             ],
             linkerSettings: [
                 .unsafeFlags([

@@ -4,3 +4,4 @@ VoiceFlow/.build/
 VoiceFlow/dist/
 VoiceFlow/Frameworks/
 docs/
+VoiceFlow/.xcbuild/

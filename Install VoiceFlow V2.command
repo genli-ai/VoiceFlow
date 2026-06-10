@@ -63,6 +63,17 @@ XCODE_VER=$(xcodebuild -version 2>/dev/null | head -1)
 [ -n "$XCODE_VER" ] || fail "xcodebuild 不可用，请打开一次 Xcode 完成组件安装后重试"
 green "  ✓ ${XCODE_VER}"
 
+# Metal 工具链（Xcode 26 起默认不内置，需单独下载一次，约 2-4GB）
+# 注意：必须实际执行 metal 来检测——新 Xcode 自带一个"占位桩"，光查路径会误判已安装
+if ! xcrun metal --version >/dev/null 2>&1; then
+    echo "  Metal 编译工具链缺失，开始自动下载（一次性，约 2-4GB，取决于网速）…"
+    xcodebuild -downloadComponent MetalToolchain \
+        || fail "Metal 工具链下载失败。请手动在终端运行：xcodebuild -downloadComponent MetalToolchain"
+    xcrun metal --version >/dev/null 2>&1 \
+        || fail "Metal 工具链仍不可用，请打开 Xcode → Settings → Components 手动安装 Metal Toolchain 后重试"
+    green "  ✓ Metal 工具链就绪"
+fi
+
 # ── 2. whisper 框架（备用引擎） ──────────────────────
 step "2/6 准备 whisper.cpp 引擎"
 if [ -d "Frameworks/whisper.xcframework" ]; then
