@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "VoiceFlow",
     platforms: [
-        // V2：Qwen3-ASR(MLX) 引擎要求 macOS 15+；Intel/老系统请使用 V1 (main 分支)
+        // Qwen3-ASR(MLX) 引擎要求 macOS 15+、Apple Silicon
         .macOS("15.0")
     ],
     dependencies: [
@@ -16,26 +16,13 @@ let package = Package(
         .executableTarget(
             name: "VoiceFlow",
             dependencies: [
-                "whisper",
                 .product(name: "MLXASR", package: "mlx-swift-asr"),
             ],
             path: "Sources/VoiceFlow",
             swiftSettings: [
-                // 源码按 Swift 5 语言模式编译（避免 Swift 6 严格并发检查）。
-                // unsafeFlags 写法在 xcodebuild 下不生效，必须用标准 API
+                // 源码按 Swift 5 语言模式编译（避免 Swift 6 严格并发检查）
                 .swiftLanguageMode(.v5)
-            ],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-Xlinker", "-rpath",
-                    "-Xlinker", "@executable_path/../Frameworks"
-                ])
             ]
-        ),
-        // 预编译的 whisper.cpp（含 Metal 加速），由安装脚本下载到 Frameworks/ 目录
-        .binaryTarget(
-            name: "whisper",
-            path: "Frameworks/whisper.xcframework"
         )
     ]
 )

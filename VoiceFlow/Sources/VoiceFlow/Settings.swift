@@ -70,50 +70,11 @@ enum PolishLevel: String, CaseIterable {
     }
 }
 
-// MARK: - 预置模型
-
-struct WhisperModelOption {
-    let fileName: String
-    let title: String
-    let sizeNote: String
-}
-
-enum WhisperModels {
-    static let all: [WhisperModelOption] = [
-        WhisperModelOption(fileName: "ggml-large-v3-turbo-q5_0.bin",
-                           title: "Large-v3 Turbo（推荐，准确率高）",
-                           sizeNote: "约 547 MB"),
-        WhisperModelOption(fileName: "ggml-small.bin",
-                           title: "Small（均衡）",
-                           sizeNote: "约 488 MB"),
-        WhisperModelOption(fileName: "ggml-base.bin",
-                           title: "Base（最快，准确率较低）",
-                           sizeNote: "约 148 MB"),
-    ]
-
-    static var defaultFileName: String {
-        #if arch(arm64)
-        return "ggml-large-v3-turbo-q5_0.bin"
-        #else
-        return "ggml-small.bin"
-        #endif
-    }
-
-    static func downloadURLs(for fileName: String) -> [URL] {
-        let path = "ggerganov/whisper.cpp/resolve/main/\(fileName)"
-        return [
-            URL(string: "https://hf-mirror.com/\(path)")!,
-            URL(string: "https://huggingface.co/\(path)")!,
-        ]
-    }
-}
-
 // MARK: - 设置键
 
 enum SettingsKeys {
     static let hotkey = "hotkey"
     static let triggerMode = "triggerMode"
-    static let language = "language"
     static let polishEnabled = "polishEnabled"
     static let polishLevel = "polishLevel"
     static let openaiBaseURL = "openaiBaseURL"
@@ -122,10 +83,7 @@ enum SettingsKeys {
     static let customVocabulary = "customVocabulary"
     static let playSounds = "playSounds"
     static let restoreClipboard = "restoreClipboard"
-    static let modelFileName = "modelFileName"
-    static let fastDecode = "fastDecode"
     static let smartLevel = "smartLevel"
-    static let engine = "engine"
     static let qwenModelRepo = "qwenModelRepo"
 }
 
@@ -139,7 +97,6 @@ final class Settings {
         d.register(defaults: [
             SettingsKeys.hotkey: HotkeyChoice.rightOption.rawValue,
             SettingsKeys.triggerMode: TriggerMode.toggle.rawValue,
-            SettingsKeys.language: "auto",
             SettingsKeys.polishEnabled: true,
             SettingsKeys.polishLevel: PolishLevel.light.rawValue,
             SettingsKeys.openaiBaseURL: "https://api.openai.com/v1",
@@ -148,10 +105,7 @@ final class Settings {
             SettingsKeys.customVocabulary: "",
             SettingsKeys.playSounds: true,
             SettingsKeys.restoreClipboard: true,
-            SettingsKeys.modelFileName: WhisperModels.defaultFileName,
-            SettingsKeys.fastDecode: false,
             SettingsKeys.smartLevel: false,
-            SettingsKeys.engine: EngineChoice.auto.rawValue,
             SettingsKeys.qwenModelRepo: QwenModels.defaultRepo,
         ])
 
@@ -173,12 +127,6 @@ final class Settings {
     var triggerMode: TriggerMode {
         get { TriggerMode(rawValue: d.string(forKey: SettingsKeys.triggerMode) ?? "") ?? .toggle }
         set { d.set(newValue.rawValue, forKey: SettingsKeys.triggerMode) }
-    }
-
-    /// "zh" / "en" / "auto"
-    var language: String {
-        get { d.string(forKey: SettingsKeys.language) ?? "zh" }
-        set { d.set(newValue, forKey: SettingsKeys.language) }
     }
 
     var polishEnabled: Bool {
@@ -229,27 +177,10 @@ final class Settings {
         set { d.set(newValue, forKey: SettingsKeys.restoreClipboard) }
     }
 
-    var modelFileName: String {
-        get { d.string(forKey: SettingsKeys.modelFileName) ?? WhisperModels.defaultFileName }
-        set { d.set(newValue, forKey: SettingsKeys.modelFileName) }
-    }
-
-    /// 速度优先解码：贪心解码替代束搜索，快 2-3 倍，准确率略降
-    var fastDecode: Bool {
-        get { d.bool(forKey: SettingsKeys.fastDecode) }
-        set { d.set(newValue, forKey: SettingsKeys.fastDecode) }
-    }
-
     /// 智能档位：按当前应用自动选择润色档
     var smartLevelEnabled: Bool {
         get { d.bool(forKey: SettingsKeys.smartLevel) }
         set { d.set(newValue, forKey: SettingsKeys.smartLevel) }
-    }
-
-    /// 识别引擎选择
-    var engine: EngineChoice {
-        get { EngineChoice(rawValue: d.string(forKey: SettingsKeys.engine) ?? "") ?? .auto }
-        set { d.set(newValue.rawValue, forKey: SettingsKeys.engine) }
     }
 
     /// Qwen 模型 HF 仓库 ID

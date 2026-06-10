@@ -77,7 +77,7 @@ private struct GeneralTab: View {
                 Toggle("开始 / 完成时播放提示音", isOn: $playSounds)
                 Toggle("输入后恢复原剪贴板内容", isOn: $restoreClipboard)
                 Toggle("登录时自动启动", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { newValue in
+                    .onChange(of: launchAtLogin) { _, newValue in
                         do {
                             if newValue {
                                 try SMAppService.mainApp.register()
@@ -132,25 +132,17 @@ private struct PermissionBadge: View {
     }
 }
 
-// MARK: - 识别
+// MARK: - 识别（Qwen3-ASR）
 
 private struct RecognitionTab: View {
-    @AppStorage(SettingsKeys.language) private var language = "auto"
-    @AppStorage(SettingsKeys.fastDecode) private var fastDecode = false
-    @AppStorage(SettingsKeys.modelFileName) private var modelFileName = WhisperModels.defaultFileName
-    @AppStorage(SettingsKeys.customVocabulary) private var vocabulary = ""
-    @AppStorage(SettingsKeys.engine) private var engine = EngineChoice.auto.rawValue
     @AppStorage(SettingsKeys.qwenModelRepo) private var qwenRepo = QwenModels.defaultRepo
-    @ObservedObject private var downloader = ModelDownloader.shared
-    @ObservedObject private var qwenDownloader = QwenModelDownloader.shared
+    @AppStorage(SettingsKeys.customVocabulary) private var vocabulary = ""
+    @ObservedObject private var downloader = QwenModelDownloader.shared
     @State private var refreshTick = 0
+    @State private var updateMessage = ""
+    @State private var checkingUpdate = false
 
     private var modelExists: Bool {
-        _ = refreshTick
-        return FileManager.default.fileExists(atPath: Paths.modelsDir.appendingPathComponent(modelFileName).path)
-    }
-
-    private var qwenModelExists: Bool {
         _ = refreshTick
         let dir = QwenModels.localDirectory(for: qwenRepo)
         return FileManager.default.fileExists(atPath: dir.appendingPathComponent("model.safetensors").path)
@@ -159,66 +151,9 @@ private struct RecognitionTab: View {
     var body: some View {
         Form {
             Section {
-                Picker("识别引擎：", selection: $engine) {
-                    ForEach(EngineChoice.allCases, id: \.rawValue) { choice in
-                        Text(choice.displayName).tag(choice.rawValue)
-                    }
-                }
-                Picker("Qwen 模型：", selection: $qwenRepo) {
+                Picker("识别模型：", selection: $qwenRepo) {
                     ForEach(QwenModels.all, id: \.repo) { m in
                         Text("\(m.title) · \(m.sizeNote)").tag(m.repo)
-                    }
-                }
-                HStack {
-                    Image(systemName: qwenModelExists ? "checkmark.circle.fill" : "arrow.down.circle")
-                        .foregroundColor(qwenModelExists ? .green : .orange)
-                    Text(qwenModelExists ? "Qwen 模型已就绪" : "Qwen 模型未下载")
-                    Spacer()
-                    if qwenDownloader.isDownloading {
-                        Button("取消") { qwenDownloader.cancel() }
-                    } else {
-                        Button(qwenModelExists ? "重新下载" : "下载 Qwen 模型") {
-                            qwenDownloader.download(repo: qwenRepo)
-                        }
-                    }
-                }
-                if qwenDownloader.isDownloading {
-                    ProgressView(value: qwenDownloader.progress)
-                }
-                if !qwenDownloader.statusText.isEmpty {
-                    Text(qwenDownloader.statusText)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Text("Qwen3-ASR：2026 新一代引擎，中文与中英混说显著更准，且专有词汇表会作为热词直接送入模型（whisper 不具备）。仅支持 Apple Silicon。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section {
-                Picker("识别语言（whisper 引擎用）：", selection: $language) {
-                    Text("自动检测（多语言推荐）").tag("auto")
-                    Text("中文（可夹杂英文）").tag("zh")
-                    Text("英文").tag("en")
-                    Text("日本語").tag("ja")
-                    Text("한국어").tag("ko")
-                    Text("Français").tag("fr")
-                    Text("Deutsch").tag("de")
-                    Text("Español").tag("es")
-                }
-                Text("本地模型支持约 99 种语言。说多种语言就用「自动检测」；固定说某一种时明确选择该语言识别更准。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Toggle("速度优先解码（快 2-3 倍，准确率略降）", isOn: $fastDecode)
-                Text("如果觉得识别等太久可以打开；中英混合错误变多就关掉。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section {
-                Picker("识别模型：", selection: $modelFileName) {
-                    ForEach(WhisperModels.all, id: \.fileName) { m in
-                        Text("\(m.title) · \(m.sizeNote)").tag(m.fileName)
                     }
                 }
                 HStack {
@@ -229,12 +164,20 @@ private struct RecognitionTab: View {
                     if downloader.isDownloading {
                         Button("取消") { downloader.cancel() }
                     } else {
-                        Button(modelExists ? "重新下载" : "下载模型") {
-                            downloader.download(fileName: modelFileName)
+                        Button(modelExists ? "重新下载 / 更新" : "下载模型") {
+                            updateMessage = ""
+                            QwenEngine.shared.unloadModel()
+                            downloader.download(repo: qwenRepo, force: modelExists)
                         }
-                    }
-                    Button("打开模型文件夹") {
-                        NSWorkspace.shared.open(Paths.modelsDir)
+                        Button(checkingUpdate ? "检查中…" : "检查更新") {
+                            checkingUpdate = true
+                            updateMessage = ""
+                            QwenModelDownloader.checkForUpdate(repo: qwenRepo) { _, message in
+                                checkingUpdate = false
+                                updateMessage = message
+                            }
+                        }
+                        .disabled(checkingUpdate)
                     }
                 }
                 if downloader.isDownloading {
@@ -245,7 +188,15 @@ private struct RecognitionTab: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                Text("识别完全在本机进行，录音不会上传。模型存放在 资源库/Application Support/VoiceFlow/models。")
+                if !updateMessage.isEmpty {
+                    Text(updateMessage)
+                        .font(.caption)
+                        .foregroundColor(updateMessage.contains("发现新版本") ? .orange : .secondary)
+                }
+                Text("Qwen3-ASR（2026）：约 30 种语言 + 22 种中文方言，自动检测语言，识别完全在本机进行。模型来自 HuggingFace（hf-mirror 加速）。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("「检查更新」会对比远端仓库版本；发现新版本后点「重新下载 / 更新」即可。专有词汇表是你的本地热词，修改后下次识别立刻生效。")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -255,9 +206,9 @@ private struct RecognitionTab: View {
                     Text("专有词汇表（人名、品牌、术语等，用逗号或换行分隔）：")
                     TextEditor(text: $vocabulary)
                         .font(.system(size: 12))
-                        .frame(height: 60)
+                        .frame(height: 80)
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.3)))
-                    Text("识别和润色时都会参考这些词，显著减少专有名词出错。")
+                    Text("这些词会作为热词直接送入识别模型，并参与 AI 润色纠错——专有名词识别准确率的第一杠杆，强烈建议填写。")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -268,7 +219,9 @@ private struct RecognitionTab: View {
         .onReceive(downloader.$isDownloading) { _ in
             refreshTick += 1
         }
-        .onReceive(qwenDownloader.$isDownloading) { _ in
+        .onChange(of: qwenRepo) { _, _ in
+            updateMessage = ""
+            QwenEngine.shared.unloadModel()
             refreshTick += 1
         }
     }
@@ -378,9 +331,9 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("VoiceFlow")
                 .font(.title2.bold())
-            Text("版本 1.0.0")
+            Text("版本 2.0.0 · Qwen3-ASR 引擎")
                 .foregroundColor(.secondary)
-            Text("本地 Whisper 语音识别 + GPT 智能润色\n在任何应用里，按下快捷键开口说话，松手即得到一段干净的文字。")
+            Text("本地 Qwen3-ASR 语音识别 + GPT 智能润色\n在任何应用里，按下快捷键开口说话，松手即得到一段干净的文字。")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .font(.callout)

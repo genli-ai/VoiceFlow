@@ -1,6 +1,6 @@
 import AVFoundation
 
-/// 麦克风录音，实时重采样为 16kHz 单声道 Float32（whisper 需要的格式）
+/// 麦克风录音，实时重采样为 16kHz 单声道 Float32（识别模型需要的格式）
 final class AudioRecorder {
 
     private var engine: AVAudioEngine?

@@ -11,7 +11,9 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
     @Published var progress: Double = 0
     @Published var statusText = ""
 
-    private let hosts = ["https://hf-mirror.com", "https://huggingface.co"]
+    private static let defaultHosts = ["https://hf-mirror.com", "https://huggingface.co"]
+
+    private let hosts = QwenModelDownloader.defaultHosts
     private var hostIndex = 0
     private var repo = ""
     private var destDir: URL!
@@ -23,10 +25,16 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
     private var currentTask: URLSessionDownloadTask?
     private var cancelled = false
 
-    func download(repo: String) {
+    static func remoteSHAKey(_ repo: String) -> String { "qwenRemoteSHA_" + repo }
+    static func remoteModifiedKey(_ repo: String) -> String { "qwenRemoteModified_" + repo }
+
+    func download(repo: String, force: Bool = false) {
         guard !isDownloading else { return }
         self.repo = repo
         self.destDir = QwenModels.localDirectory(for: repo)
+        if force {
+            try? FileManager.default.removeItem(at: destDir)
+        }
         hostIndex = 0
         fileIndex = 0
         completedBytes = 0
@@ -99,6 +107,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
             statusText = "下载完成 ✓（\(files.count) 个文件）"
             session?.finishTasksAndInvalidate()
             session = nil
+            recordRemoteVersion()
             return
         }
         let file = files[fileIndex]
@@ -124,6 +133,110 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
         let task = session!.downloadTask(with: url)
         currentTask = task
         task.resume()
+    }
+
+    /// 下载完成后记录远端仓库版本，供"检查更新"对比。
+    private func recordRemoteVersion() {
+        let repo = self.repo
+        Self.fetchRemoteVersion(repo: repo, hosts: hosts) { version in
+            guard let version = version else { return }
+            Self.store(version, for: repo)
+        }
+    }
+
+    /// 检查 HF 仓库是否比本地下载时更新。completion 在主线程回调 (是否有更新, 说明文字)。
+    static func checkForUpdate(repo: String, completion: @escaping (Bool, String) -> Void) {
+        fetchRemoteVersion(repo: repo) { version in
+            guard let remote = version else {
+                completion(false, "检查失败：无法连接模型仓库")
+                return
+            }
+
+            let defaults = UserDefaults.standard
+            let localSHA = defaults.string(forKey: remoteSHAKey(repo))
+            let localModified = defaults.string(forKey: remoteModifiedKey(repo))
+            let modelPath = QwenModels.localDirectory(for: repo).appendingPathComponent("model.safetensors").path
+            let hasLocalModel = FileManager.default.fileExists(atPath: modelPath)
+
+            if let remoteSHA = remote.sha, let localSHA = localSHA {
+                if remoteSHA == localSHA {
+                    completion(false, "已是最新（远端版本 \(remote.displayLabel)）")
+                } else {
+                    completion(true, "发现新版本：远端 \(remote.displayLabel)，本地 \(String(localSHA.prefix(8)))。点「重新下载 / 更新」")
+                }
+                return
+            }
+
+            if let remoteModified = remote.lastModified, let localModified = localModified {
+                if remoteModified == localModified {
+                    completion(false, "已是最新（远端版本 \(remote.displayLabel)）")
+                } else {
+                    completion(true, "发现新版本：远端 \(remote.displayLabel)，本地 \(String(localModified.prefix(10)))。点「重新下载 / 更新」")
+                }
+                return
+            }
+
+            if hasLocalModel {
+                completion(false, "本地模型没有版本记录；点「重新下载 / 更新」一次即可建立更新基准")
+            } else {
+                completion(false, "模型尚未下载；先点「下载模型」")
+            }
+        }
+    }
+
+    private struct RemoteVersion {
+        let sha: String?
+        let lastModified: String?
+
+        var displayLabel: String {
+            if let sha = sha, !sha.isEmpty {
+                return String(sha.prefix(8))
+            }
+            if let lastModified = lastModified, !lastModified.isEmpty {
+                return String(lastModified.prefix(10))
+            }
+            return "未知"
+        }
+    }
+
+    private static func store(_ version: RemoteVersion, for repo: String) {
+        let defaults = UserDefaults.standard
+        if let sha = version.sha {
+            defaults.set(sha, forKey: remoteSHAKey(repo))
+        }
+        if let modified = version.lastModified {
+            defaults.set(modified, forKey: remoteModifiedKey(repo))
+        }
+    }
+
+    private static func fetchRemoteVersion(repo: String,
+                                           hosts: [String] = defaultHosts,
+                                           completion: @escaping (RemoteVersion?) -> Void) {
+        func attempt(_ index: Int) {
+            guard index < hosts.count else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            guard let url = URL(string: "\(hosts[index])/api/models/\(repo)") else { return }
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 20
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                guard error == nil,
+                      let http = response as? HTTPURLResponse, http.statusCode == 200,
+                      let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      ((json["sha"] as? String) != nil || (json["lastModified"] as? String) != nil) else {
+                    attempt(index + 1)
+                    return
+                }
+                let version = RemoteVersion(sha: json["sha"] as? String,
+                                            lastModified: json["lastModified"] as? String)
+                DispatchQueue.main.async {
+                    completion(version)
+                }
+            }.resume()
+        }
+        attempt(0)
     }
 
     private func finishWithError(_ message: String) {
