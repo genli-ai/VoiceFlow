@@ -9,17 +9,17 @@
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.ligen.voiceflow</string>
+    <string>com.ligen.voiceflow.v3</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>VoiceFlow</string>
     <key>CFBundleDisplayName</key>
-    <string>VoiceFlow</string>
+    <string>VoiceFlow V3 Lab</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.0.4</string>
+    <string>3.0.0</string>
     <key>CFBundleVersion</key>
     <string>6</string>
     <key>LSMinimumSystemVersion</key>

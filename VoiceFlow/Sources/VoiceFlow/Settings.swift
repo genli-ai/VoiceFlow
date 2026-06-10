@@ -85,6 +85,7 @@ enum SettingsKeys {
     static let restoreClipboard = "restoreClipboard"
     static let smartLevel = "smartLevel"
     static let qwenModelRepo = "qwenModelRepo"
+    static let skillsEnabled = "skillsEnabled"
 }
 
 // MARK: - 设置
@@ -107,6 +108,7 @@ final class Settings {
             SettingsKeys.restoreClipboard: true,
             SettingsKeys.smartLevel: false,
             SettingsKeys.qwenModelRepo: QwenModels.defaultRepo,
+            SettingsKeys.skillsEnabled: true,
         ])
 
         // 一次性迁移：统一默认模型为 gpt-5.4-mini（质量与速度的平衡点）
@@ -181,6 +183,12 @@ final class Settings {
     var smartLevelEnabled: Bool {
         get { d.bool(forKey: SettingsKeys.smartLevel) }
         set { d.set(newValue, forKey: SettingsKeys.smartLevel) }
+    }
+
+    /// V3 语音技能（修改选中文本 / 帮我回复）
+    var skillsEnabled: Bool {
+        get { d.bool(forKey: SettingsKeys.skillsEnabled) }
+        set { d.set(newValue, forKey: SettingsKeys.skillsEnabled) }
     }
 
     /// Qwen 模型 HF 仓库 ID

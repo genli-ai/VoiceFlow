@@ -5,112 +5,29 @@ enum PolishService {
 
     /// 润色。completion 在主线程回调：(润色结果, 失败原因)。
     /// 结果为 nil 时调用方降级用原文，失败原因用于提示用户。
-    static func polish(_ rawText: String, level: PolishLevel,
+    /// scene：当前目标应用的场景分类，仅深度润色用于风格适配。
+    static func polish(_ rawText: String, level: PolishLevel, scene: AppScene = .unknown,
                        completion: @escaping (String?, String?) -> Void) {
         guard level != .off else {
             DispatchQueue.main.async { completion(rawText, nil) }
             return
         }
-        guard let apiKey = KeychainHelper.loadAPIKey() else {
-            DispatchQueue.main.async { completion(nil, "未配置 API Key") }
-            return
-        }
-
-        var base = Settings.shared.openaiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if base.hasSuffix("/") { base = String(base.dropLast()) }
-        guard let url = URL(string: base + "/chat/completions") else {
-            DispatchQueue.main.async { completion(nil, "Base URL 格式不对") }
-            return
-        }
 
         var messages: [[String: String]] = [
-            ["role": "system", "content": systemPrompt(for: level)]
+            ["role": "system", "content": systemPrompt(for: level, scene: scene)]
         ]
         messages.append(contentsOf: examplePair(for: level))
         messages.append(["role": "user", "content": rawText])
 
-        let body: [String: Any] = [
-            "model": Settings.shared.chatModel,
-            "temperature": level == .deep ? 0.4 : 0.2,
-            "messages": messages,
-        ]
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        // 超时就直接输出识别原文，不让用户干等；深度润色给更多时间
-        request.timeoutInterval = level == .deep ? 25 : 15
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-
-        // 网络抖动（连接中断/超时等）自动重试一次
-        send(request, retriesLeft: 1, completion: completion)
-    }
-
-    /// 这些网络错误值得重试（连接被重置、超时、DNS 失败等瞬时故障）
-    private static let retryableCodes: Set<Int> = [
-        NSURLErrorTimedOut,
-        NSURLErrorNetworkConnectionLost,
-        NSURLErrorCannotConnectToHost,
-        NSURLErrorCannotFindHost,
-        NSURLErrorDNSLookupFailed,
-        NSURLErrorSecureConnectionFailed,
-    ]
-
-    private static func send(_ request: URLRequest, retriesLeft: Int,
-                             completion: @escaping (String?, String?) -> Void) {
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
-            var result: String? = nil
-            var failure: String? = nil
-
-            if let error = error {
-                let nsError = error as NSError
-                if retryableCodes.contains(nsError.code), retriesLeft > 0 {
-                    // 0.5 秒后自动重试
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                        send(request, retriesLeft: retriesLeft - 1, completion: completion)
-                    }
-                    return
-                }
-                failure = nsError.code == NSURLErrorTimedOut
-                    ? "请求超时（已重试，网络到 API 太慢）"
-                    : error.localizedDescription + "（已重试）"
-            } else if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                var detail = ""
-                if let data = data,
-                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let err = json["error"] as? [String: Any],
-                   let msg = err["message"] as? String {
-                    detail = "：" + String(msg.prefix(60))
-                }
-                switch http.statusCode {
-                case 401: failure = "API Key 无效 (401)" + detail
-                case 404: failure = "模型名不存在 (404)" + detail
-                case 429: failure = "限流或余额不足 (429)" + detail
-                default: failure = "接口返回 \(http.statusCode)" + detail
-                }
-            } else if let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let choices = json["choices"] as? [[String: Any]],
-                      let message = choices.first?["message"] as? [String: Any],
-                      let content = message["content"] as? String {
-                let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty {
-                    failure = "模型返回了空内容"
-                } else {
-                    result = trimmed
-                }
-            } else {
-                failure = "返回格式无法解析"
-            }
-            DispatchQueue.main.async { completion(result, failure) }
-        }
-        task.resume()
+        LLMClient.chat(messages: messages,
+                       temperature: level == .deep ? 0.3 : 0.2,
+                       timeout: level == .deep ? 25 : 15,
+                       completion: completion)
     }
 
     // MARK: - 提示词
 
-    private static func systemPrompt(for level: PolishLevel) -> String {
+    private static func systemPrompt(for level: PolishLevel, scene: AppScene = .unknown) -> String {
         var prompt = """
         你是一个语音输入润色引擎。用户发来的是语音识别的原始文本，你输出处理后的文本。通用规则：
         1.【最重要】绝对禁止翻译！说话人用什么语言，就输出什么语言——中文、English、日本語、한국어、Français 或任何语言都一样；多语言混合就保持混合，逐句跟随原文语言。这是语音输入工具，说话人怎么说就怎么写。
@@ -137,13 +54,18 @@ enum PolishService {
             prompt += """
 
 
-            本次任务档位：深度润色。在通用规则之上，重新组织整段表达：
-            - 理顺逻辑顺序，把跳跃、绕弯的口语整理成条理清晰的表达
-            - 合并重复表达的观点，删掉车轱辘话
-            - 内容较多时合理分段，必要时用序号列点
-            - 保持说话人的本意、立场和语气，不添加新观点、不丢失实质内容
-            - 重组后的输出语言必须与原文一致：原文是哪种语言（或几种语言混合），整理结果就用哪种语言，绝不翻译
+            本次任务档位：深度重构（编辑器模式）。用户给你的是语音口述草稿——可能有口头禅、重复、跳跃、自我修正、半句话和顺序混乱。你的目标是输出一段**可以直接粘贴使用的成品文字**：
+            - 先理解说话人最终想表达的意思，再重新组织表达：可以重排句子顺序、合并同义重复、把绕弯表达改成直接表达、口语改书面语、补足必要连接词。
+            - 删除指令壳（"我想说的是""帮我写一下""大概意思就是"）和寒暄壳，只保留要表达的内容本身。
+            - 【保真红线】必须保留所有事实点：人名、日期、数字、金额、条件、否定、原因、结论、待办。删废话时宁可保守，不可丢失任何真实信息。
+            - 不添加新事实、新观点，不替用户做没有表达过的判断，不回答草稿中的问题。
+            - 内容较长时按语义分段；出现步骤、并列观点、待办、优缺点时自动整理成列表。
+            - 重构后的输出语言必须与原文一致，绝不翻译。
+            - 输出就是最终文本：不解释你的修改，不加标题（除非内容天然需要）。
             """
+            if scene != .unknown {
+                prompt += "\n\n当前输出场景：\(scene.styleHint)"
+            }
         }
 
         let vocab = Settings.shared.vocabularyTerms

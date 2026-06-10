@@ -232,6 +232,7 @@ private struct RecognitionTab: View {
 private struct PolishTab: View {
     @AppStorage(SettingsKeys.polishLevel) private var polishLevel = PolishLevel.light.rawValue
     @AppStorage(SettingsKeys.smartLevel) private var smartLevel = false
+    @AppStorage(SettingsKeys.skillsEnabled) private var skillsEnabled = true
     @AppStorage(SettingsKeys.openaiBaseURL) private var baseURL = "https://api.openai.com/v1"
     @AppStorage(SettingsKeys.chatModel) private var chatModel = "gpt-5.4-mini"
     @AppStorage(SettingsKeys.customPolishRules) private var customRules = ""
@@ -254,6 +255,13 @@ private struct PolishTab: View {
                     .foregroundColor(.secondary)
                 Toggle("智能档位：按当前应用自动选择", isOn: $smartLevel)
                 Text("聊天应用（微信/QQ/Slack/钉钉/飞书等）→ 标准润色；邮件/文档（Mail/Word/Notes/Notion 等）→ 深度润色；代码编辑器/终端 → 仅识别；其余应用 → 上面手动选的档位。注意：手动选「仅识别」时智能档位不生效，保证完全不联网。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
+                Toggle("语音技能（V3 实验）", isOn: $skillsEnabled)
+                Text("修改选中文本：先选中文字，按快捷键说「改正式一点 / 精简一下 / 翻译成英文」，结果直接替换选区。帮我回复：选中对方消息后说「帮我回复，就说我周五有空」，草稿复制到剪贴板。判定规则保守，正常口述不会误触发。")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -331,7 +339,7 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("VoiceFlow")
                 .font(.title2.bold())
-            Text("版本 2.0.4 · Qwen3-ASR 引擎")
+            Text("版本 3.0.0-lab · Qwen3-ASR 引擎 + 语音技能")
                 .foregroundColor(.secondary)
             Text("本地 Qwen3-ASR 语音识别 + GPT 智能润色\n在任何应用里，按下快捷键开口说话，松手即得到一段干净的文字。")
                 .multilineTextAlignment(.center)

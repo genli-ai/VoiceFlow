@@ -24,6 +24,8 @@ final class DictationController {
     /// 录音开始时的前台应用（文字将粘贴到这个应用）
     private var targetBundleID = ""
     private var targetAppName = ""
+    /// 录音开始时的选中文本（V3 语音技能用；读不到为 nil）
+    private var targetSelection: String?
 
     // 智能档位的内置应用分类
     private static let chatApps: Set<String> = [
@@ -116,6 +118,8 @@ final class DictationController {
             let frontmost = NSWorkspace.shared.frontmostApplication
             self.targetBundleID = frontmost?.bundleIdentifier ?? ""
             self.targetAppName = frontmost?.localizedName ?? ""
+            // V3：录此刻的选区快照，供语音技能（修改选中/帮我回复）使用
+            self.targetSelection = Settings.shared.skillsEnabled ? SelectionReader.readSelectedText() : nil
             self.recorder.onLevel = { [weak self] level in
                 DispatchQueue.main.async {
                     self?.overlay.state.pushLevel(level)
@@ -166,6 +170,17 @@ final class DictationController {
                     self.overlay.flashError("没有听到内容")
                     return
                 }
+                // V3：先过技能路由——保守规则，判不准就当普通输入
+                switch SkillRouter.route(text: rawText, hasSelection: self.targetSelection != nil) {
+                case .modifySelection(let instruction):
+                    self.runModifySelection(instruction: instruction, raw: rawText, isColdStart: isColdStart)
+                    return
+                case .replyDraft(let instruction):
+                    self.runReplyDraft(instruction: instruction, raw: rawText)
+                    return
+                case .dictation:
+                    break
+                }
                 var level = Settings.shared.polishLevel
                 // 智能档位只在手动档为标准/深度时介入；手动选了"仅识别"= 永不联网，智能档位让位
                 if Settings.shared.smartLevelEnabled, level != .off {
@@ -178,7 +193,8 @@ final class DictationController {
                     }
                     self.overlay.showProcessing(label)
                     let tPolish = Date()
-                    PolishService.polish(rawText, level: level) { [weak self] polished, failure in
+                    let scene = SceneClassifier.scene(for: self.targetBundleID)
+                    PolishService.polish(rawText, level: level, scene: scene) { [weak self] polished, failure in
                         guard let self = self else { return }
                         let polishSeconds = Date().timeIntervalSince(tPolish)
                         let timing = String(format: "识别 %.1fs · 润色 %.1fs", asrSeconds, polishSeconds)
@@ -197,6 +213,59 @@ final class DictationController {
                     self.deliver(raw: rawText, final: rawText, note: "已输入（\(timing)）",
                                  allowClipboardRestore: !isColdStart)
                 }
+            }
+        }
+    }
+
+    // MARK: - V3 语音技能
+
+    /// 技能：修改选中文本——结果直接粘贴覆盖仍处于选中状态的文字
+    private func runModifySelection(instruction: String, raw: String, isColdStart: Bool) {
+        guard let selection = targetSelection else {
+            phase = .idle
+            overlay.flashError("没有读到选中文本")
+            Sounds.playError()
+            return
+        }
+        overlay.showProcessing("执行指令中…")
+        AgentService.modifySelection(selection, instruction: instruction) { [weak self] result, failure in
+            guard let self = self else { return }
+            if let result = result {
+                self.deliver(raw: raw, final: result, note: "已替换选中文本",
+                             allowClipboardRestore: !isColdStart)
+            } else {
+                self.phase = .idle
+                self.overlay.flashError("指令执行失败（\(failure ?? "未知")）")
+                Sounds.playError()
+            }
+        }
+    }
+
+    /// 技能：帮我回复——基于选中的对方消息草拟回复。
+    /// 安全策略：不自动粘贴（焦点通常在消息区而非输入框），复制到剪贴板由用户 ⌘V。
+    private func runReplyDraft(instruction: String, raw: String) {
+        guard let context = targetSelection else {
+            phase = .idle
+            overlay.flashError("读不到上下文：先选中要回复的消息，再说「帮我回复」")
+            Sounds.playError()
+            return
+        }
+        overlay.showProcessing("草拟回复中…")
+        let scene = SceneClassifier.scene(for: targetBundleID)
+        AgentService.replyDraft(context: context, instruction: instruction, scene: scene) { [weak self] result, failure in
+            guard let self = self else { return }
+            self.phase = .idle
+            if let result = result {
+                let final = TextPostProcessor.fixMixedPunctuation(result)
+                HistoryStore.shared.add(raw: raw, polished: final)
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(final, forType: .string)
+                self.overlay.flashSuccess("回复草稿已复制——点到输入框按 ⌘V")
+                Sounds.playSuccess()
+            } else {
+                self.overlay.flashError("草拟失败（\(failure ?? "未知")）")
+                Sounds.playError()
             }
         }
     }
