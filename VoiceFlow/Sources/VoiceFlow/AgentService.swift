@@ -24,7 +24,7 @@ enum LLMClient {
             DispatchQueue.main.async { completion(nil, "未配置 API Key") }
             return
         }
-        var base = Settings.shared.openaiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        var base = Settings.shared.currentBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if base.hasSuffix("/") { base = String(base.dropLast()) }
         guard let url = URL(string: base + "/chat/completions") else {
             DispatchQueue.main.async { completion(nil, "Base URL 格式不对") }
@@ -32,7 +32,7 @@ enum LLMClient {
         }
 
         let body: [String: Any] = [
-            "model": Settings.shared.chatModel,
+            "model": Settings.shared.currentChatModel,
             "temperature": temperature,
             "messages": messages,
         ]

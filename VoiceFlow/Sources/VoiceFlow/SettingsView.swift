@@ -233,11 +233,14 @@ private struct PolishTab: View {
     @AppStorage(SettingsKeys.polishLevel) private var polishLevel = PolishLevel.light.rawValue
     @AppStorage(SettingsKeys.smartLevel) private var smartLevel = false
     @AppStorage(SettingsKeys.skillsEnabled) private var skillsEnabled = true
+    @AppStorage(SettingsKeys.llmProvider) private var provider = LLMProvider.openai.rawValue
     @AppStorage(SettingsKeys.openaiBaseURL) private var baseURL = "https://api.openai.com/v1"
     @AppStorage(SettingsKeys.chatModel) private var chatModel = "gpt-5.4-mini"
-    @AppStorage(SettingsKeys.customPolishRules) private var customRules = ""
+    @AppStorage(SettingsKeys.deepseekBaseURL) private var dsBaseURL = LLMProvider.deepseek.defaultBaseURL
+    @AppStorage(SettingsKeys.deepseekModel) private var dsModel = LLMProvider.deepseek.defaultModel
     @State private var apiKey = KeychainHelper.loadAPIKey() ?? ""
     @State private var keySaved = (KeychainHelper.loadAPIKey() != nil)
+    @AppStorage(SettingsKeys.customPolishRules) private var customRules = ""
     @State private var testResult = ""
     @State private var testing = false
 
@@ -267,7 +270,22 @@ private struct PolishTab: View {
             }
 
             Section {
-                SecureField("OpenAI API Key（sk-…）", text: $apiKey)
+                Picker("服务商：", selection: $provider) {
+                    ForEach(LLMProvider.allCases, id: \.rawValue) { p in
+                        Text(p.displayName).tag(p.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: provider) { _, newValue in
+                    // 切换服务商：载入对应的 Key 状态
+                    let account = LLMProvider(rawValue: newValue)?.keychainAccount
+                    apiKey = KeychainHelper.loadAPIKey(account: account) ?? ""
+                    keySaved = !apiKey.isEmpty
+                    testResult = ""
+                }
+                SecureField(provider == LLMProvider.deepseek.rawValue
+                            ? "DeepSeek API Key（sk-…）" : "OpenAI API Key（sk-…）",
+                            text: $apiKey)
                     .textFieldStyle(.roundedBorder)
                 HStack {
                     Button("保存 Key 到钥匙串") {
@@ -299,14 +317,24 @@ private struct PolishTab: View {
                         .foregroundColor(.secondary)
                         .lineLimit(3)
                 }
-                TextField("Base URL", text: $baseURL)
-                    .textFieldStyle(.roundedBorder)
-                Text("默认 https://api.openai.com/v1。也可以填任何 OpenAI 兼容接口（中转、代理等）。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                TextField("模型名（如 gpt-5.4-mini）", text: $chatModel)
-                    .textFieldStyle(.roundedBorder)
-                Text("默认 gpt-5.4-mini（质量与速度均衡）。追求极致速度可换 gpt-5.4-nano，追求深度重组质量可换 gpt-5.5。")
+                if provider == LLMProvider.deepseek.rawValue {
+                    TextField("Base URL", text: $dsBaseURL)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("模型名（如 deepseek-chat）", text: $dsModel)
+                        .textFieldStyle(.roundedBorder)
+                    Text("默认 https://api.deepseek.com，模型 deepseek-chat。Key 在 platform.deepseek.com 申请。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    TextField("Base URL", text: $baseURL)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("模型名（如 gpt-5.4-mini）", text: $chatModel)
+                        .textFieldStyle(.roundedBorder)
+                    Text("默认 https://api.openai.com/v1 + gpt-5.4-mini（均衡）。极致速度换 gpt-5.4-nano，深度质量换 gpt-5.5；也可填任何 OpenAI 兼容中转。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Text("两个服务商的 Key 分别保存在钥匙串，切换即生效，互不影响。")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

@@ -70,6 +70,38 @@ enum PolishLevel: String, CaseIterable {
     }
 }
 
+// MARK: - 大模型服务商
+
+enum LLMProvider: String, CaseIterable {
+    case openai
+    case deepseek
+
+    var displayName: String {
+        switch self {
+        case .openai: return "OpenAI (GPT)"
+        case .deepseek: return "DeepSeek"
+        }
+    }
+    var keychainAccount: String {
+        switch self {
+        case .openai: return "openai_api_key"
+        case .deepseek: return "deepseek_api_key"
+        }
+    }
+    var defaultBaseURL: String {
+        switch self {
+        case .openai: return "https://api.openai.com/v1"
+        case .deepseek: return "https://api.deepseek.com"
+        }
+    }
+    var defaultModel: String {
+        switch self {
+        case .openai: return "gpt-5.4-mini"
+        case .deepseek: return "deepseek-chat"
+        }
+    }
+}
+
 // MARK: - 设置键
 
 enum SettingsKeys {
@@ -85,6 +117,9 @@ enum SettingsKeys {
     static let restoreClipboard = "restoreClipboard"
     static let smartLevel = "smartLevel"
     static let qwenModelRepo = "qwenModelRepo"
+    static let llmProvider = "llmProvider"
+    static let deepseekBaseURL = "deepseekBaseURL"
+    static let deepseekModel = "deepseekModel"
     static let skillsEnabled = "skillsEnabled"
 }
 
@@ -109,6 +144,9 @@ final class Settings {
             SettingsKeys.smartLevel: false,
             SettingsKeys.qwenModelRepo: QwenModels.defaultRepo,
             SettingsKeys.skillsEnabled: true,
+            SettingsKeys.llmProvider: LLMProvider.openai.rawValue,
+            SettingsKeys.deepseekBaseURL: LLMProvider.deepseek.defaultBaseURL,
+            SettingsKeys.deepseekModel: LLMProvider.deepseek.defaultModel,
         ])
 
         // 一次性迁移：统一默认模型为 gpt-5.4-mini（质量与速度的平衡点）
@@ -183,6 +221,36 @@ final class Settings {
     var smartLevelEnabled: Bool {
         get { d.bool(forKey: SettingsKeys.smartLevel) }
         set { d.set(newValue, forKey: SettingsKeys.smartLevel) }
+    }
+
+    /// 润色/技能使用的大模型服务商（GPT 或 DeepSeek，二选一）
+    var llmProvider: LLMProvider {
+        get { LLMProvider(rawValue: d.string(forKey: SettingsKeys.llmProvider) ?? "") ?? .openai }
+        set { d.set(newValue.rawValue, forKey: SettingsKeys.llmProvider) }
+    }
+
+    var deepseekBaseURL: String {
+        get { d.string(forKey: SettingsKeys.deepseekBaseURL) ?? LLMProvider.deepseek.defaultBaseURL }
+        set { d.set(newValue, forKey: SettingsKeys.deepseekBaseURL) }
+    }
+
+    var deepseekModel: String {
+        get { d.string(forKey: SettingsKeys.deepseekModel) ?? LLMProvider.deepseek.defaultModel }
+        set { d.set(newValue, forKey: SettingsKeys.deepseekModel) }
+    }
+
+    /// 当前服务商生效的 Base URL / 模型名
+    var currentBaseURL: String {
+        switch llmProvider {
+        case .openai: return openaiBaseURL
+        case .deepseek: return deepseekBaseURL
+        }
+    }
+    var currentChatModel: String {
+        switch llmProvider {
+        case .openai: return chatModel
+        case .deepseek: return deepseekModel
+        }
     }
 
     /// V3 语音技能（修改选中文本 / 帮我回复）
