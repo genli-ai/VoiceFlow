@@ -239,7 +239,8 @@ private struct PolishTab: View {
     @AppStorage(SettingsKeys.deepseekBaseURL) private var dsBaseURL = LLMProvider.deepseek.defaultBaseURL
     @AppStorage(SettingsKeys.deepseekModel) private var dsModel = LLMProvider.deepseek.defaultModel
     @State private var apiKey = KeychainHelper.loadAPIKey() ?? ""
-    @State private var keySaved = (KeychainHelper.loadAPIKey() != nil)
+    @State private var openaiSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.openai.keychainAccount) != nil)
+    @State private var dsSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.deepseek.keychainAccount) != nil)
     @AppStorage(SettingsKeys.customPolishRules) private var customRules = ""
     @State private var testResult = ""
     @State private var testing = false
@@ -270,40 +271,42 @@ private struct PolishTab: View {
             }
 
             Section {
-                Picker("服务商：", selection: $provider) {
+                Picker("当前使用：", selection: $provider) {
                     ForEach(LLMProvider.allCases, id: \.rawValue) { p in
                         Text(p.displayName).tag(p.rawValue)
                     }
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: provider) { _, newValue in
-                    // 切换服务商：载入对应的 Key 状态
+                    // 切换服务商：载入对应的 Key
                     let account = LLMProvider(rawValue: newValue)?.keychainAccount
                     apiKey = KeychainHelper.loadAPIKey(account: account) ?? ""
-                    keySaved = !apiKey.isEmpty
                     testResult = ""
+                }
+                HStack(spacing: 14) {
+                    Text("润色和语音指令将使用上方选中的服务商")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    KeyStatusBadge(name: "GPT", saved: openaiSaved)
+                    KeyStatusBadge(name: "DeepSeek", saved: dsSaved)
                 }
                 SecureField(provider == LLMProvider.deepseek.rawValue
                             ? "DeepSeek API Key（sk-…）" : "OpenAI API Key（sk-…）",
                             text: $apiKey)
                     .textFieldStyle(.roundedBorder)
                 HStack {
-                    Button("保存 Key 到钥匙串") {
+                    Button("保存 Key") {
                         KeychainHelper.saveAPIKey(apiKey)
-                        keySaved = (KeychainHelper.loadAPIKey() != nil)
-                        testResult = keySaved ? "已保存 ✓" : "已清空"
-                    }
-                    if keySaved {
-                        Label("已保存", systemImage: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.caption)
+                        refreshSavedStates()
+                        testResult = (KeychainHelper.loadAPIKey() != nil) ? "已保存 ✓" : "已清空"
                     }
                     Spacer()
                     Button(testing ? "测试中…" : "测试连接") {
                         testing = true
                         testResult = ""
                         KeychainHelper.saveAPIKey(apiKey)
-                        keySaved = (KeychainHelper.loadAPIKey() != nil)
+                        refreshSavedStates()
                         PolishService.test { _, message in
                             testing = false
                             testResult = message
@@ -311,6 +314,9 @@ private struct PolishTab: View {
                     }
                     .disabled(testing)
                 }
+                Text("Key 加密保存在 macOS 系统钥匙串里（可在「钥匙串访问」App 中查看），仅本机可读，不写入任何明文文件。两个服务商的 Key 都可以保存，互不覆盖。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 if !testResult.isEmpty {
                     Text(testResult)
                         .font(.caption)
@@ -322,7 +328,7 @@ private struct PolishTab: View {
                         .textFieldStyle(.roundedBorder)
                     TextField("模型名（如 deepseek-chat）", text: $dsModel)
                         .textFieldStyle(.roundedBorder)
-                    Text("默认 https://api.deepseek.com，模型 deepseek-chat。Key 在 platform.deepseek.com 申请。")
+                    Text("可选模型：deepseek-chat（推荐，通用对话模型，润色快且便宜）、deepseek-reasoner（推理模型，慢且贵，不适合润色场景）。Key 在 platform.deepseek.com 申请。")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
@@ -334,9 +340,6 @@ private struct PolishTab: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                Text("两个服务商的 Key 分别保存在钥匙串，切换即生效，互不影响。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
 
             Section {
@@ -355,6 +358,26 @@ private struct PolishTab: View {
         .formStyle(.grouped)
         .padding(.top, 4)
     }
+
+    private func refreshSavedStates() {
+        openaiSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.openai.keychainAccount) != nil)
+        dsSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.deepseek.keychainAccount) != nil)
+    }
+}
+
+/// Key 保存状态小徽章
+private struct KeyStatusBadge: View {
+    let name: String
+    let saved: Bool
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: saved ? "key.fill" : "key")
+                .foregroundColor(saved ? .green : .secondary)
+            Text(name + (saved ? " ✓" : " 未填"))
+        }
+        .font(.caption)
+        .foregroundColor(saved ? .primary : .secondary)
+    }
 }
 
 // MARK: - 关于
@@ -369,7 +392,7 @@ private struct AboutTab: View {
                 .font(.title2.bold())
             Text("版本 3.0.0-lab · Qwen3-ASR 引擎 + 语音技能")
                 .foregroundColor(.secondary)
-            Text("本地 Qwen3-ASR 语音识别 + GPT 智能润色\n在任何应用里，按下快捷键开口说话，松手即得到一段干净的文字。")
+            Text("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .font(.callout)
