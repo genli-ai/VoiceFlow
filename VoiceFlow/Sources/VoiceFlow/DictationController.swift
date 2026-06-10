@@ -87,14 +87,16 @@ final class DictationController {
             onNeedSettings?()
             return
         }
-        // 检查辅助功能权限（粘贴需要）——每次启动只提示一次，不反复骚扰
-        if !Permissions.isAccessibilityTrusted && !didPromptAccessibility {
+        // 检查辅助功能权限（粘贴需要）。权限刚打开时 macOS 往往要重启 App 才完全生效。
+        guard Permissions.isAccessibilityTrusted else {
             didPromptAccessibility = true
             Permissions.promptAccessibility()
+            overlay.flashError("请先开启辅助功能权限，然后重启 VoiceFlow")
+            Sounds.playError()
+            return
         }
         // 检查麦克风权限
         let alreadyAuthorized = Permissions.microphoneGranted
-        let mode = Settings.shared.triggerMode
         Permissions.ensureMicrophone { [weak self] granted in
             guard let self = self else { return }
             guard granted else {
@@ -103,10 +105,11 @@ final class DictationController {
                 Permissions.openMicrophoneSettings()
                 return
             }
-            // 按住模式下，如果权限是这次异步授权的，按键早已松开，
-            // 此时不能自动开始录音（否则没人来停止它），让用户重新按一次。
-            if mode == .hold && !alreadyAuthorized {
-                self.overlay.flashSuccess("麦克风已授权，请再按住说话")
+            // 首次授权会弹系统窗口并打断焦点，授权期间这一次输入不可靠；
+            // 统一让用户再触发一次，避免"历史里有但没粘贴进输入框"。
+            if !alreadyAuthorized {
+                self.overlay.flashSuccess("麦克风已授权，请再按一次开始")
+                Sounds.playSuccess()
                 return
             }
             guard self.phase == .idle else { return }
