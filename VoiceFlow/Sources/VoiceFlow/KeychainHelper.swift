@@ -3,8 +3,7 @@ import Security
 
 /// 把 OpenAI API Key 存在系统钥匙串里（不落明文文件）
 enum KeychainHelper {
-    // V3 Lab 独立命名空间，与 V2 正式版互不干扰
-    private static let service = "com.ligen.voiceflow.v3"
+    private static let service = "com.ligen.voiceflow"
 
     /// 不传 account 时默认操作"当前选中的服务商"的 Key
     static func saveAPIKey(_ value: String, account: String? = nil) {

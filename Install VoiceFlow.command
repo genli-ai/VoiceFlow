@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# VoiceFlow V3 Lab installer (experimental, coexists with the release VoiceFlow.app)
-# VoiceFlow V3 Lab 安装脚本（实验版，与正式版 VoiceFlow.app 并存）
+# VoiceFlow installer — build from source and install
+# VoiceFlow 安装脚本——从源码编译并安装
 # Requires: macOS 15+, Apple Silicon, full Xcode
 #
 set -u
@@ -32,9 +32,9 @@ fail() {
 
 echo
 bold "╔══════════════════════════════════════════╗"
-bold "║   VoiceFlow V3 Lab $(t "安装（实验版）       " "Installer (beta)      ")║"
+bold "║   VoiceFlow $(t "安装" "Installer")                          ║"
 bold "╚══════════════════════════════════════════╝"
-echo "  $(t "与正式版 VoiceFlow.app 并存，设置/Key 相互独立，模型共享。" "Coexists with the release VoiceFlow.app — separate settings/keys, shared models.")"
+
 
 ARCH=$(uname -m)
 [ "$ARCH" = "arm64" ] || fail "$(t "需要 Apple Silicon" "Apple Silicon required")"
@@ -59,7 +59,7 @@ fi
 green "  ✓ $(t "构建环境就绪" "Build environment ready")"
 
 # ── 2. Build ───────────────────────────────────────
-step "2/4 $(t "编译 VoiceFlow V3 Lab（首次 5-15 分钟）" "Building VoiceFlow V3 Lab (first build takes 5-15 min)")"
+step "2/4 $(t "编译 VoiceFlow（首次 5-15 分钟）" "Building VoiceFlow (first build takes 5-15 min)")"
 DERIVED=".xcbuild"
 if xcodebuild -scheme VoiceFlow \
     -configuration Release \
@@ -76,7 +76,7 @@ green "  ✓ $(t "编译成功" "Build succeeded")"
 # ── 3. Package ─────────────────────────────────────
 step "3/4 $(t "打包应用" "Packaging the app")"
 STAGE=$(mktemp -d)
-APP="$STAGE/VoiceFlow V3 Lab.app"
+APP="$STAGE/VoiceFlow.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BIN" "$APP/Contents/MacOS/VoiceFlow"
@@ -108,32 +108,31 @@ codesign --force -s - "$APP" || fail "$(t "签名失败" "Code signing failed")"
 codesign --verify --deep "$APP" || fail "$(t "签名校验未通过" "Signature verification failed")"
 green "  ✓ $(t "打包完成" "Packaging complete")"
 
-# ── 4. Install (does not touch the release VoiceFlow.app) ──
+# ── 4. Install ─────────────────────────────────────
 step "4/4 $(t "安装到 /Applications" "Installing to /Applications")"
-pkill -f "VoiceFlow V3 Lab.app" 2>/dev/null || true
+pkill -x VoiceFlow 2>/dev/null || true
 sleep 0.5
-DEST="/Applications/VoiceFlow V3 Lab.app"
+DEST="/Applications/VoiceFlow.app"
 rm -rf "$DEST" 2>/dev/null
 if ! ditto "$APP" "$DEST" 2>/dev/null; then
-    DEST="$HOME/Applications/VoiceFlow V3 Lab.app"
+    DEST="$HOME/Applications/VoiceFlow.app"
     mkdir -p "$HOME/Applications"
     rm -rf "$DEST"
     ditto "$APP" "$DEST" || fail "$(t "无法复制到应用程序文件夹" "Could not copy to the Applications folder")"
 fi
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
 touch "$DEST" 2>/dev/null || true
-tccutil reset Accessibility com.ligen.voiceflow.v3 >/dev/null 2>&1 || true
+tccutil reset Accessibility com.ligen.voiceflow >/dev/null 2>&1 || true
 green "  ✓ $(t "已安装：" "Installed: ")$DEST"
 
 open "$DEST"
 
 echo
-bold "🧪 $(t "V3 Lab 安装完成！注意：" "V3 Lab installed! Next steps:")"
+bold "🎉 $(t "VoiceFlow 安装完成！接下来：" "VoiceFlow installed! Next steps:")"
 echo
-echo "  1. $(t "V3 Lab 是独立 App：需要单独授权麦克风和辅助功能" "V3 Lab is a separate app: grant Microphone and Accessibility permissions for it")"
-echo "  2. $(t "设置和 API Key 与正式版隔离——首次使用要在 V3 Lab 设置里重新填 Key" "Settings and API keys are isolated from the release app — re-enter your key in V3 Lab's settings")"
-echo "  3. $(t "识别模型与正式版共享，不用重新下载" "Speech models are shared with the release app — no re-download needed")"
-echo "  4. $(t "同时跑两个版本时快捷键会撞车——测试 V3 时建议先退出正式版" "Running both versions at once causes hotkey conflicts — quit the release app while testing V3")"
+echo "  1. $(t "重新授权【辅助功能】：系统设置 → 隐私与安全性 → 辅助功能（已有条目先删再加）" "Re-grant Accessibility: System Settings → Privacy & Security → Accessibility (remove the old entry, then add again)")"
+echo "  2. $(t "首次使用：设置 → 识别 → 下载模型（约 860MB，一次性）" "First run: Settings → Recognition → Download Model (~860 MB, one-time)")"
+echo "  3. $(t "轻点右⌥听写；按住右⌥说指令（改写/回复/草拟/翻译）" "Tap Right-Option to dictate; hold it to speak commands (rewrite/reply/draft/translate)")"
 echo
 echo "$(t "按任意键关闭本窗口…" "Press any key to close…")"
 read -n 1 -s || true

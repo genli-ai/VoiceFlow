@@ -284,7 +284,7 @@ private struct PolishTab: View {
             }
 
             Section {
-                Toggle(tr("语音技能（V3 实验）", "Voice commands (V3 Lab)"), isOn: $skillsEnabled)
+                Toggle(tr("语音技能", "Voice commands"), isOn: $skillsEnabled)
                 Text(tr("意图靠手势区分，永不误判：轻点快捷键 = 纯语音输入，说什么打什么；按住快捷键说话、松手执行 = 指令模式——选中文字后按住说「改正式一点 / 翻译成英文」直接替换选区；选中对方消息后按住说「帮我回复…」草稿进剪贴板；什么都没选就是自由指令（草拟邮件、翻译、提问）。",
                         "Intent is decided by gesture, never by guessing: tap = pure dictation, whatever you say gets typed. Hold = command mode — with text selected, say \"make it formal / translate to English\" to replace the selection; with a message selected, say \"help me reply…\" to get a draft on the clipboard; with nothing selected it's a free-form command (draft an email, translate, ask anything)."))
                     .font(.caption)
@@ -418,8 +418,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("VoiceFlow")
                 .font(.title2.bold())
-            Text(tr("版本 3.0.0-lab · Qwen3-ASR 引擎 + 语音技能",
-                    "Version 3.0.0-lab · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.0.0 · Qwen3-ASR 引擎 + 语音技能",
+                    "Version 3.0.0 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))
