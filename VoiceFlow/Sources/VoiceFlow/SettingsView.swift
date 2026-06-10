@@ -230,7 +230,7 @@ private struct RecognitionTab: View {
 // MARK: - AI 润色
 
 private struct PolishTab: View {
-    @AppStorage(SettingsKeys.polishLevel) private var polishLevel = PolishLevel.light.rawValue
+    @AppStorage(SettingsKeys.polishLevel) private var polishLevel = PolishLevel.smart.rawValue
     @AppStorage(SettingsKeys.smartLevel) private var smartLevel = false
     @AppStorage(SettingsKeys.skillsEnabled) private var skillsEnabled = true
     @AppStorage(SettingsKeys.llmProvider) private var provider = LLMProvider.openai.rawValue
