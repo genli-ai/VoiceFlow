@@ -250,15 +250,22 @@ final class DictationController {
             runModifySelection(instruction: rawText, raw: rawText, isColdStart: isColdStart)
             return
         }
-        // 没选区：⌘C 兜底再试一次，仍没有就报错
-        SelectionReader.readSelectedTextWithClipboardFallback { [weak self] text in
+        // 没选区：当作自由指令——口述任务（草拟邮件/翻译/提问…），结果粘贴到光标处
+        runFreeform(instruction: rawText, raw: rawText, isColdStart: isColdStart)
+    }
+
+    /// 技能：自由指令——指令模式下的"万能入口"
+    private func runFreeform(instruction: String, raw: String, isColdStart: Bool) {
+        overlay.showProcessing("执行指令中…")
+        let scene = SceneClassifier.scene(for: targetBundleID)
+        AgentService.freeform(instruction: instruction, scene: scene) { [weak self] result, failure in
             guard let self = self else { return }
-            if let text = text {
-                self.targetSelection = text
-                self.runModifySelection(instruction: rawText, raw: rawText, isColdStart: isColdStart)
+            if let result = result {
+                self.deliver(raw: raw, final: result, note: "已输入指令结果",
+                             allowClipboardRestore: !isColdStart)
             } else {
                 self.phase = .idle
-                self.overlay.flashError("指令模式：先选中要处理的文本，或说「帮我回复」")
+                self.overlay.flashError("指令执行失败（\(failure ?? "未知")）")
                 Sounds.playError()
             }
         }

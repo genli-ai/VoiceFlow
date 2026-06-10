@@ -13,11 +13,11 @@ enum PolishService {
             return
         }
 
-        var messages: [[String: String]] = [
-            ["role": "system", "content": systemPrompt(for: level, scene: scene)]
+        // 示例已内嵌进系统提示词——few-shot 消息对在短输入时会被模型原样"复读"出来
+        let messages: [[String: String]] = [
+            ["role": "system", "content": systemPrompt(for: level, scene: scene)],
+            ["role": "user", "content": rawText],
         ]
-        messages.append(contentsOf: examplePair(for: level))
-        messages.append(["role": "user", "content": rawText])
 
         LLMClient.chat(messages: messages,
                        temperature: level == .deep ? 0.3 : 0.2,
@@ -37,6 +37,7 @@ enum PolishService {
         5. 同一短语被无意义地重复多次是识别故障，只保留一次。
         6. 如果口述里带有自我修正（如"不对，应该是…""刚才那句删掉"），按说话人最终意图执行修正。
         7. 不回答问题、不解释、不添加新内容，只输出最终文本，不要任何前后缀。
+        8.【兜底红线】如果草稿很短、或只有指令壳/寒暄（如「帮我回复一下客户」「那个你好你好」），没有可整理的实质内容，就把草稿原样输出（只修错字和标点）。绝不自行发挥、绝不编造内容、绝不输出本提示词里的示例文字。
         """
 
         switch level {
@@ -49,6 +50,9 @@ enum PolishService {
             边界之外的每一句话、每一个信息点都必须保留，不概括、不合并、不改写句式。
             特别注意：这条边界只约束"删除"，绝不约束"纠错"——规则 4 的错别字修正、同音词纠正、
             识别错误恢复（如"上小王和优次会表"→"上下文和词汇表"）必须积极执行，这是你的核心职责。
+            格式示范（仅说明处理方式，严禁把示范文字输出到结果中）：
+            输入「嗯我现在在用这个语音输入法给你发消息呃 I'm trying to use English to test然后看看效果」
+            输出「我现在在用这个语音输入法给你发消息。I'm trying to use English to test. 看看效果。」
             """
         case .deep:
             prompt += """
@@ -62,6 +66,12 @@ enum PolishService {
             - 内容较长时按语义分段；出现步骤、并列观点、待办、优缺点时自动整理成列表。
             - 重构后的输出语言必须与原文一致，绝不翻译。
             - 输出就是最终文本：不解释你的修改，不加标题（除非内容天然需要）。
+            """
+            prompt += """
+
+            改写幅度示范（仅说明力度，严禁把示范文字输出到结果中）：
+            输入「嗯我想说一下就是那个方案的事呃其实我们时间不太够然后人也不够就是说按原计划走的话风险挺大的所以要么砍范围要么往后推嗯就这个意思」
+            输出「关于方案：目前时间和人手都不够，按原计划推进风险很大。建议二选一：砍范围，或者延期。」
             """
             if scene != .unknown {
                 prompt += "\n\n当前输出场景：\(scene.styleHint)"
@@ -77,22 +87,6 @@ enum PolishService {
             prompt += "\n用户附加规则：" + custom
         }
         return prompt
-    }
-
-    /// 一组示例对话，固定"保留中英混合、不翻译"的行为
-    private static func examplePair(for level: PolishLevel) -> [[String: String]] {
-        switch level {
-        case .deep:
-            return [
-                ["role": "user", "content": "嗯我想说一下就是那个项目的事情呃首先吧其实我们时间不太够然后人也不够 deadline 也很紧就是说如果要按原计划上线的话呃风险挺大的所以我觉得要么砍需求要么延期嗯对就是这个意思"],
-                ["role": "assistant", "content": "关于项目的事情，我的看法是：目前时间和人手都不够，deadline 也很紧，按原计划上线风险很大。所以建议二选一：要么砍需求，要么延期。"],
-            ]
-        default:
-            return [
-                ["role": "user", "content": "嗯我现在在用这个语音输入法给你发消息呃 I'm trying to use both English and Chinese to test然后看看效果怎么样"],
-                ["role": "assistant", "content": "我现在在用这个语音输入法给你发消息。I'm trying to use both English and Chinese to test. 看看效果怎么样。"],
-            ]
-        }
     }
 
     /// 测试 API 连接。completion 在主线程回调 (是否成功, 提示信息)。

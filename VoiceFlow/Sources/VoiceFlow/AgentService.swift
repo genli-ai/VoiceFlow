@@ -119,6 +119,28 @@ enum AgentService {
         ], temperature: 0.3, timeout: 25, completion: completion)
     }
 
+    /// 技能：自由指令——把口述当作给大模型的任务（草拟邮件、翻译、列提纲、解释等），
+    /// 输出可直接粘贴使用的成品文本
+    static func freeform(instruction: String, scene: AppScene,
+                         completion: @escaping (String?, String?) -> Void) {
+        var system = """
+        你是一个语音驱动的写作助手。用户口述一个任务——草拟邮件、翻译一段话、改写、起标题、列提纲、回答问题等——你输出可以直接粘贴使用的成品文本。
+        规则：
+        1. 只输出结果正文，不解释、不加"好的""以下是"之类的前后缀。
+        2. 绝不编造具体事实：用户没提供的人名、日期、金额、地址等，用【待补充】占位。
+        3. 输出语言跟随任务要求；任务没指定时，跟随口述使用的语言。
+        4. 如果口述是一个问题，直接给出简洁准确的答案正文。
+        5. 邮件、文档类输出注意完整结构；聊天消息类输出保持简短自然。
+        """
+        if scene != .unknown {
+            system += "\n当前粘贴目标场景：\(scene.styleHint)"
+        }
+        LLMClient.chat(messages: [
+            ["role": "system", "content": system],
+            ["role": "user", "content": instruction],
+        ], temperature: 0.4, timeout: 40, completion: completion)
+    }
+
     /// 技能：根据选中的对方消息草拟回复
     static func replyDraft(context: String, instruction: String, scene: AppScene,
                            completion: @escaping (String?, String?) -> Void) {
