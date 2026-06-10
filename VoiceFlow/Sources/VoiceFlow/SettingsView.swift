@@ -331,7 +331,7 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("VoiceFlow")
                 .font(.title2.bold())
-            Text("版本 2.0.1 · Qwen3-ASR 引擎")
+            Text("版本 2.0.2 · Qwen3-ASR 引擎")
                 .foregroundColor(.secondary)
             Text("本地 Qwen3-ASR 语音识别 + GPT 智能润色\n在任何应用里，按下快捷键开口说话，松手即得到一段干净的文字。")
                 .multilineTextAlignment(.center)

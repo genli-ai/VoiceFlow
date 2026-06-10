@@ -204,7 +204,8 @@ final class DictationController {
         HistoryStore.shared.add(raw: raw, polished: finalText)
         phase = .idle
         TextInserter.insert(finalText, targetBundleID: targetBundleID,
-                            allowClipboardRestore: allowClipboardRestore) { [weak self] outcome in
+                            allowClipboardRestore: allowClipboardRestore,
+                            conservativePaste: !allowClipboardRestore) { [weak self] outcome in
             guard let self = self else { return }
             switch outcome {
             case .pasted:

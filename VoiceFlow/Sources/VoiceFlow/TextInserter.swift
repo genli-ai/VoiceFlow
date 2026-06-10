@@ -14,34 +14,33 @@ enum TextInserter {
     /// 拉不回来就把文本留在剪贴板并告知用户。completion 在主线程回调。
     static func insert(_ text: String, targetBundleID: String = "",
                        allowClipboardRestore: Bool = true,
+                       conservativePaste: Bool = false,
                        completion: @escaping (Outcome) -> Void) {
-        let frontID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-
-        // 焦点没动过：正常粘贴
-        if targetBundleID.isEmpty || frontID == targetBundleID {
-            performPaste(text, allowRestore: allowClipboardRestore) {
-                completion(.pasted)
-            }
+        guard Permissions.isAccessibilityTrusted else {
+            putOnClipboard(text)
+            completion(.clipboardOnly)
             return
         }
 
-        // 焦点切走了：尝试把目标应用拉回前台
+        guard !targetBundleID.isEmpty else {
+            pasteIntoCurrentFocus(text, allowRestore: allowClipboardRestore,
+                                  conservativePaste: conservativePaste, completion: completion)
+            return
+        }
+
+        // 无论当前 frontmost 是否匹配，都重新激活目标 App。
+        // App 启动后的第一次粘贴最容易出现"App 在前台但输入框还没吃键"。
         guard let app = NSRunningApplication
             .runningApplications(withBundleIdentifier: targetBundleID).first else {
             putOnClipboard(text)
             completion(.clipboardOnly)
             return
         }
-        app.activate(options: [])
-        waitForFrontmost(targetBundleID, attemptsLeft: 8) { arrived in
+        app.activate(options: [.activateAllWindows])
+        waitForFrontmost(targetBundleID, attemptsLeft: conservativePaste ? 16 : 8) { arrived in
             if arrived {
-                // 等一拍让焦点真正落到输入框，再粘贴；
-                // 风险路径不恢复剪贴板，万一没粘上用户还能 ⌘V
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    performPaste(text, allowRestore: false) {
-                        completion(.pasted)
-                    }
-                }
+                pasteIntoCurrentFocus(text, allowRestore: allowClipboardRestore,
+                                      conservativePaste: conservativePaste, completion: completion)
             } else {
                 putOnClipboard(text)
                 completion(.clipboardOnly)
@@ -71,7 +70,23 @@ enum TextInserter {
         pb.setString(text, forType: .string)
     }
 
+    private static func pasteIntoCurrentFocus(_ text: String, allowRestore: Bool,
+                                              conservativePaste: Bool,
+                                              completion: @escaping (Outcome) -> Void) {
+        let focusDelay = conservativePaste ? 0.75 : 0.25
+        DispatchQueue.main.asyncAfter(deadline: .now() + focusDelay) {
+            if tryAccessibilityInsert(text) {
+                completion(.pasted)
+                return
+            }
+            performPaste(text, allowRestore: allowRestore, conservativePaste: conservativePaste) {
+                completion(.pasted)
+            }
+        }
+    }
+
     private static func performPaste(_ text: String, allowRestore: Bool,
+                                     conservativePaste: Bool = false,
                                      completion: (() -> Void)? = nil) {
         let pasteboard = NSPasteboard.general
         let oldString = pasteboard.string(forType: .string)
@@ -80,8 +95,9 @@ enum TextInserter {
         pasteboard.setString(text, forType: .string)
 
         // 给剪贴板写入留一点时间，再发送 ⌘V
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            sendCmdV {
+        let pasteDelay = conservativePaste ? 0.35 : 0.18
+        DispatchQueue.main.asyncAfter(deadline: .now() + pasteDelay) {
+            sendCmdV(keyHold: conservativePaste ? 0.12 : 0.03) {
                 completion?()
             }
             if allowRestore && Settings.shared.restoreClipboard {
@@ -98,7 +114,7 @@ enum TextInserter {
         }
     }
 
-    private static func sendCmdV(completion: (() -> Void)? = nil) {
+    private static func sendCmdV(keyHold: Double = 0.03, completion: (() -> Void)? = nil) {
         let source = CGEventSource(stateID: .combinedSessionState)
         // 9 = kVK_ANSI_V
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
@@ -109,9 +125,41 @@ enum TextInserter {
         keyDown.flags = .maskCommand
         keyUp.flags = .maskCommand
         keyDown.post(tap: .cghidEventTap)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + keyHold) {
             keyUp.post(tap: .cghidEventTap)
             completion?()
         }
+    }
+
+    private static func tryAccessibilityInsert(_ text: String) -> Bool {
+        let system = AXUIElementCreateSystemWide()
+        var rawFocused: CFTypeRef?
+        let focusedResult = AXUIElementCopyAttributeValue(system,
+                                                          kAXFocusedUIElementAttribute as CFString,
+                                                          &rawFocused)
+        guard focusedResult == .success,
+              let focused = rawFocused,
+              CFGetTypeID(focused) == AXUIElementGetTypeID() else {
+            return false
+        }
+
+        let element = focused as! AXUIElement
+        var roleValue: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue) == .success,
+           let role = roleValue as? String,
+           role == "AXSecureTextField" {
+            return false
+        }
+        var subroleValue: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subroleValue) == .success,
+           let subrole = subroleValue as? String,
+           subrole == "AXSecureTextField" {
+            return false
+        }
+
+        let result = AXUIElementSetAttributeValue(element,
+                                                 kAXSelectedTextAttribute as CFString,
+                                                 text as CFTypeRef)
+        return result == .success
     }
 }
