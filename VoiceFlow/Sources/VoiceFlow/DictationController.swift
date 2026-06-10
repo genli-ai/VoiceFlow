@@ -26,6 +26,8 @@ final class DictationController {
     private var targetAppName = ""
     /// 录音开始时的选中文本（V3 语音技能用；读不到为 nil）
     private var targetSelection: String?
+    /// 本次录音是否为"指令模式"（按住快捷键触发）
+    private var skillSession = false
 
     // 智能档位的内置应用分类
     private static let chatApps: Set<String> = [
@@ -73,9 +75,20 @@ final class DictationController {
         if phase == .recording { finishRecording() }
     }
 
+    /// 指令模式：按住快捷键触发（技能关闭时降级为普通输入）
+    func skillHoldStart() {
+        guard phase == .idle else { return }
+        startRecording(skill: Settings.shared.skillsEnabled)
+    }
+
+    func skillHoldEnd() {
+        if phase == .recording { finishRecording() }
+    }
+
     func cancel() {
         guard phase == .recording else { return }
         _ = recorder.stop()
+        skillSession = false
         phase = .idle
         overlay.hide()
         Sounds.playCancel()
@@ -85,7 +98,7 @@ final class DictationController {
 
     // MARK: - 流程
 
-    private func startRecording() {
+    private func startRecording(skill: Bool = false) {
         // 检查模型
         guard QwenEngine.shared.isModelAvailable else {
             overlay.flashError("识别模型未下载，请在设置中下载")
@@ -122,10 +135,11 @@ final class DictationController {
             let frontmost = NSWorkspace.shared.frontmostApplication
             self.targetBundleID = frontmost?.bundleIdentifier ?? ""
             self.targetAppName = frontmost?.localizedName ?? ""
-            // V3：录此刻的选区快照，供语音技能（修改选中/帮我回复）使用
-            self.targetSelection = Settings.shared.skillsEnabled ? SelectionReader.readSelectedText() : nil
+            // 指令模式才读选区——普通输入完全不碰选区和剪贴板
+            self.skillSession = skill
+            self.targetSelection = skill ? SelectionReader.readSelectedText() : nil
             // 微信/QQ 的无障碍接口残缺，AX 读不到时用 ⌘C 兜底（异步，不阻塞录音；用完即恢复剪贴板）
-            if self.targetSelection == nil, Settings.shared.skillsEnabled,
+            if skill, self.targetSelection == nil,
                Self.poorAXApps.contains(self.targetBundleID) {
                 SelectionReader.readSelectedTextWithClipboardFallback { [weak self] text in
                     guard let self = self, self.phase == .recording else { return }
@@ -146,7 +160,7 @@ final class DictationController {
                 return
             }
             self.phase = .recording
-            self.overlay.showRecording()
+            self.overlay.showRecording(label: skill ? "正在听指令…" : "正在听…")
             Sounds.playStart()
         }
     }
@@ -182,16 +196,11 @@ final class DictationController {
                     self.overlay.flashError("没有听到内容")
                     return
                 }
-                // V3：先过技能路由——保守规则，判不准就当普通输入
-                switch SkillRouter.route(text: rawText, hasSelection: self.targetSelection != nil) {
-                case .modifySelection(let instruction):
-                    self.runModifySelection(instruction: instruction, raw: rawText, isColdStart: isColdStart)
+                // 指令模式：这次说的话就是命令。普通输入永远不做指令解析。
+                if self.skillSession {
+                    self.skillSession = false
+                    self.runSkillSession(rawText: rawText, isColdStart: isColdStart)
                     return
-                case .replyDraft(let instruction):
-                    self.runReplyDraft(instruction: instruction, raw: rawText)
-                    return
-                case .dictation:
-                    break
                 }
                 var level = Settings.shared.polishLevel
                 // 智能档位只在手动档为标准/深度时介入；手动选了"仅识别"= 永不联网，智能档位让位
@@ -229,7 +238,31 @@ final class DictationController {
         }
     }
 
-    // MARK: - V3 语音技能
+    // MARK: - V3 语音技能（仅指令模式进入）
+
+    /// 指令分发：说「帮我回复…」→ 草拟回复；有选区 → 把整句话当修改指令；都没有 → 明确报错
+    private func runSkillSession(rawText: String, isColdStart: Bool) {
+        if SkillRouter.isReplyTrigger(rawText) {
+            runReplyDraft(instruction: rawText, raw: rawText)
+            return
+        }
+        if targetSelection != nil {
+            runModifySelection(instruction: rawText, raw: rawText, isColdStart: isColdStart)
+            return
+        }
+        // 没选区：⌘C 兜底再试一次，仍没有就报错
+        SelectionReader.readSelectedTextWithClipboardFallback { [weak self] text in
+            guard let self = self else { return }
+            if let text = text {
+                self.targetSelection = text
+                self.runModifySelection(instruction: rawText, raw: rawText, isColdStart: isColdStart)
+            } else {
+                self.phase = .idle
+                self.overlay.flashError("指令模式：先选中要处理的文本，或说「帮我回复」")
+                Sounds.playError()
+            }
+        }
+    }
 
     /// 技能：修改选中文本——结果直接粘贴覆盖仍处于选中状态的文字
     private func runModifySelection(instruction: String, raw: String, isColdStart: Bool) {

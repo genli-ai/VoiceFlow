@@ -5,13 +5,13 @@ import SwiftUI
 
 final class OverlayState: ObservableObject {
     enum Mode: Equatable {
-        case recording
+        case recording(String)
         case processing(String)
         case success(String)
         case error(String)
     }
 
-    @Published var mode: Mode = .recording
+    @Published var mode: Mode = .recording("正在听…")
     @Published var levels: [Float] = Array(repeating: 0.05, count: 13)
 
     func pushLevel(_ level: Float) {
@@ -34,7 +34,7 @@ struct OverlayView: View {
     var body: some View {
         HStack(spacing: 10) {
             switch state.mode {
-            case .recording:
+            case .recording(let label):
                 Circle()
                     .fill(Color.red)
                     .frame(width: 9, height: 9)
@@ -46,7 +46,7 @@ struct OverlayView: View {
                     }
                 }
                 .animation(.linear(duration: 0.1), value: state.levels)
-                Text("正在听…")
+                Text(label)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.85))
             case .processing(let label):
@@ -122,10 +122,10 @@ final class OverlayController {
         p.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
-    func showRecording() {
+    func showRecording(label: String = "正在听…") {
         hideGeneration += 1
         state.resetLevels()
-        state.mode = .recording
+        state.mode = .recording(label)
         let p = ensurePanel()
         position(p)
         p.orderFrontRegardless()

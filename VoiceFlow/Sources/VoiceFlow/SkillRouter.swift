@@ -47,44 +47,20 @@ enum SceneClassifier {
 }
 
 // MARK: - 语音技能路由（V3）
-
-enum SkillIntent {
-    case dictation                              // 普通语音输入
-    case modifySelection(instruction: String)   // 修改选中文本
-    case replyDraft(instruction: String)        // 草拟回复
-}
+// 意图区分靠手势而不靠内容：轻点 = 纯输入（永不解析指令），按住 = 指令模式。
+// 因此这里只需要在指令模式内部区分"回复类"和"修改类"。
 
 enum SkillRouter {
 
-    /// 根据口述文本和当前是否有选区，判断这次语音的意图。
-    /// 规则刻意保守：宁可漏判（降级为普通输入），不可误判（把要输入的话当成指令）。
-    static func route(text: String, hasSelection: Bool) -> SkillIntent {
-        guard Settings.shared.skillsEnabled else { return .dictation }
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return .dictation }
-        let compact = t.replacingOccurrences(of: " ", with: "")
+    /// 指令是否为"帮我回复"类
+    static func isReplyTrigger(_ text: String) -> Bool {
+        let compact = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "，", with: "")
             .replacingOccurrences(of: ",", with: "")
             .lowercased()
-
-        // 帮我回复：必须以触发短语开头
-        let replyTriggers = ["帮我回复", "帮我回一下", "帮我回个", "帮我答复", "helpmereply", "draftareply"]
-        for trigger in replyTriggers where compact.hasPrefix(trigger) {
-            return .replyDraft(instruction: t)
-        }
-
-        // 选区修改：必须同时满足三个条件——有活动选区、是短指令（≤40字）、以修改类动词开头
-        if hasSelection, t.count <= 40 {
-            let modifyPrefixes = [
-                "改", "把", "修改", "润色", "精简", "压缩", "扩写", "翻译", "总结",
-                "调整", "换成", "去掉", "缩短", "加长", "重写",
-                "makeit", "rewrite", "translate", "shorten", "summarize", "fix", "simplify",
-            ]
-            for prefix in modifyPrefixes where compact.hasPrefix(prefix) {
-                return .modifySelection(instruction: t)
-            }
-        }
-
-        return .dictation
+        let triggers = ["帮我回复", "帮我回一下", "帮我回个", "帮我答复", "回复他", "回复她",
+                        "helpmereply", "draftareply", "replyto"]
+        return triggers.contains { compact.hasPrefix($0) }
     }
 }

@@ -9,6 +9,9 @@ final class HotkeyManager {
     var onTapToggle: (() -> Void)?
     var onHoldStart: (() -> Void)?
     var onHoldEnd: (() -> Void)?
+    /// 轻点触发模式下：按住 0.6s 进入"指令模式"录音，松开结束（V3 语音技能）
+    var onSkillStart: (() -> Void)?
+    var onSkillEnd: (() -> Void)?
     var onCancel: (() -> Void)?
     /// 由控制器提供：当前是否正在录音
     var isRecording: (() -> Bool) = { false }
@@ -16,6 +19,8 @@ final class HotkeyManager {
     private var monitors: [Any] = []
     private var pressedAt: Date?
     var tapCandidate = false
+    private var holdWorkItem: DispatchWorkItem?
+    private var skillActive = false
 
     // 录音期间的 Esc 拦截（CGEventTap，普通按键的全局监听在新版 macOS 上不可靠）
     private var escTap: CFMachPort?
@@ -137,11 +142,25 @@ final class HotkeyManager {
                 if flags == targetFlag {
                     tapCandidate = true
                     pressedAt = Date()
+                    // 按住 0.6s 且当前空闲 → 进入指令模式录音
+                    holdWorkItem?.cancel()
+                    let work = DispatchWorkItem { [weak self] in
+                        guard let self = self, self.tapCandidate, !self.isRecording() else { return }
+                        self.skillActive = true
+                        self.onSkillStart?()
+                    }
+                    holdWorkItem = work
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
                 } else {
                     tapCandidate = false
+                    holdWorkItem?.cancel()
                 }
             } else {
-                if tapCandidate, let t = pressedAt, Date().timeIntervalSince(t) < 0.6 {
+                holdWorkItem?.cancel()
+                if skillActive {
+                    skillActive = false
+                    DispatchQueue.main.async { [weak self] in self?.onSkillEnd?() }
+                } else if tapCandidate, let t = pressedAt, Date().timeIntervalSince(t) < 0.6 {
                     DispatchQueue.main.async { [weak self] in self?.onTapToggle?() }
                 }
                 tapCandidate = false
@@ -163,8 +182,9 @@ final class HotkeyManager {
     }
 
     private func handleKeyDown(_ event: NSEvent) {
-        // 修饰键按住期间敲了别的键（快捷键等）→ 不算轻点
+        // 修饰键按住期间敲了别的键（快捷键等）→ 不算轻点，也不进指令模式
         tapCandidate = false
+        holdWorkItem?.cancel()
         // Esc 取消录音
         if event.keyCode == 53, isRecording() {
             DispatchQueue.main.async { [weak self] in self?.onCancel?() }

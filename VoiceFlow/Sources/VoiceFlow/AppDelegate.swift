@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotkeys.onTapToggle = { [weak self] in self?.dictation.toggle() }
         hotkeys.onHoldStart = { [weak self] in self?.dictation.holdStart() }
         hotkeys.onHoldEnd = { [weak self] in self?.dictation.holdEnd() }
+        hotkeys.onSkillStart = { [weak self] in self?.dictation.skillHoldStart() }
+        hotkeys.onSkillEnd = { [weak self] in self?.dictation.skillHoldEnd() }
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
         hotkeys.isRecording = { [weak self] in self?.dictation.isRecording ?? false }
         hotkeys.start()
