@@ -75,10 +75,6 @@ enum TextInserter {
                                               completion: @escaping (Outcome) -> Void) {
         let focusDelay = conservativePaste ? 0.75 : 0.25
         DispatchQueue.main.asyncAfter(deadline: .now() + focusDelay) {
-            if tryAccessibilityInsert(text) {
-                completion(.pasted)
-                return
-            }
             performPaste(text, allowRestore: allowRestore, conservativePaste: conservativePaste) {
                 completion(.pasted)
             }
@@ -101,7 +97,7 @@ enum TextInserter {
                 completion?()
             }
             if allowRestore && Settings.shared.restoreClipboard {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                     // 只有当剪贴板还是我们写入的内容时才恢复，避免覆盖用户新复制的东西
                     if pasteboard.string(forType: .string) == text {
                         pasteboard.clearContents()
@@ -115,7 +111,7 @@ enum TextInserter {
     }
 
     private static func sendCmdV(keyHold: Double = 0.03, completion: (() -> Void)? = nil) {
-        let source = CGEventSource(stateID: .combinedSessionState)
+        let source = CGEventSource(stateID: .hidSystemState)
         // 9 = kVK_ANSI_V
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else {
@@ -131,35 +127,4 @@ enum TextInserter {
         }
     }
 
-    private static func tryAccessibilityInsert(_ text: String) -> Bool {
-        let system = AXUIElementCreateSystemWide()
-        var rawFocused: CFTypeRef?
-        let focusedResult = AXUIElementCopyAttributeValue(system,
-                                                          kAXFocusedUIElementAttribute as CFString,
-                                                          &rawFocused)
-        guard focusedResult == .success,
-              let focused = rawFocused,
-              CFGetTypeID(focused) == AXUIElementGetTypeID() else {
-            return false
-        }
-
-        let element = focused as! AXUIElement
-        var roleValue: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue) == .success,
-           let role = roleValue as? String,
-           role == "AXSecureTextField" {
-            return false
-        }
-        var subroleValue: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subroleValue) == .success,
-           let subrole = subroleValue as? String,
-           subrole == "AXSecureTextField" {
-            return false
-        }
-
-        let result = AXUIElementSetAttributeValue(element,
-                                                 kAXSelectedTextAttribute as CFString,
-                                                 text as CFTypeRef)
-        return result == .success
-    }
 }
