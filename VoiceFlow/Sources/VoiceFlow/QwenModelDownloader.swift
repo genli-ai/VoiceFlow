@@ -41,7 +41,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
         cancelled = false
         isDownloading = true
         progress = 0
-        statusText = "正在获取文件清单…"
+        statusText = tr("正在获取文件清单…", "Fetching file list…")
         try? FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
         fetchFileList()
     }
@@ -52,14 +52,14 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
         session?.invalidateAndCancel()
         session = nil
         isDownloading = false
-        statusText = "已取消"
+        statusText = tr("已取消", "Cancelled")
     }
 
     // MARK: - 文件清单
 
     private func fetchFileList() {
         guard hostIndex < hosts.count else {
-            finishWithError("无法获取模型文件清单，请检查网络")
+            finishWithError(tr("无法获取模型文件清单，请检查网络", "Could not fetch the model file list — check your network"))
             return
         }
         let url = URL(string: "\(hosts[hostIndex])/api/models/\(repo)/tree/main")!
@@ -86,7 +86,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
                     list.append((path, size))
                 }
                 guard !list.isEmpty else {
-                    self.finishWithError("模型仓库为空或清单格式异常")
+                    self.finishWithError(tr("模型仓库为空或清单格式异常", "Model repo is empty or the manifest is malformed"))
                     return
                 }
                 self.files = list
@@ -104,7 +104,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
         guard fileIndex < files.count else {
             isDownloading = false
             progress = 1
-            statusText = "下载完成 ✓（\(files.count) 个文件）"
+            statusText = tr("下载完成 ✓（", "Download complete ✓ (") + "\(files.count)" + tr(" 个文件）", " files)")
             session?.finishTasksAndInvalidate()
             session = nil
             recordRemoteVersion()
@@ -129,7 +129,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
             config.timeoutIntervalForRequest = 60
             session = URLSession(configuration: config, delegate: self, delegateQueue: .main)
         }
-        statusText = "下载中 (\(fileIndex + 1)/\(files.count))：\(file.path)"
+        statusText = tr("下载中 ", "Downloading ") + "(\(fileIndex + 1)/\(files.count)): \(file.path)"
         let task = session!.downloadTask(with: url)
         currentTask = task
         task.resume()
@@ -148,7 +148,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
     static func checkForUpdate(repo: String, completion: @escaping (Bool, String) -> Void) {
         fetchRemoteVersion(repo: repo) { version in
             guard let remote = version else {
-                completion(false, "检查失败：无法连接模型仓库")
+                completion(false, tr("检查失败：无法连接模型仓库", "Check failed — cannot reach the model repo"))
                 return
             }
 
@@ -160,26 +160,26 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
 
             if let remoteSHA = remote.sha, let localSHA = localSHA {
                 if remoteSHA == localSHA {
-                    completion(false, "已是最新（远端版本 \(remote.displayLabel)）")
+                    completion(false, tr("已是最新（远端版本 ", "Up to date (remote ") + remote.displayLabel + tr("）", ")"))
                 } else {
-                    completion(true, "发现新版本：远端 \(remote.displayLabel)，本地 \(String(localSHA.prefix(8)))。点「重新下载 / 更新」")
+                    completion(true, tr("发现新版本：远端 ", "Update available: remote ") + remote.displayLabel + tr("，本地 ", ", local ") + String(localSHA.prefix(8)) + tr("。点「重新下载 / 更新」", ". Click Re-download to update"))
                 }
                 return
             }
 
             if let remoteModified = remote.lastModified, let localModified = localModified {
                 if remoteModified == localModified {
-                    completion(false, "已是最新（远端版本 \(remote.displayLabel)）")
+                    completion(false, tr("已是最新（远端版本 ", "Up to date (remote ") + remote.displayLabel + tr("）", ")"))
                 } else {
-                    completion(true, "发现新版本：远端 \(remote.displayLabel)，本地 \(String(localModified.prefix(10)))。点「重新下载 / 更新」")
+                    completion(true, tr("发现新版本：远端 ", "Update available: remote ") + remote.displayLabel + tr("，本地 ", ", local ") + String(localModified.prefix(10)) + tr("。点「重新下载 / 更新」", ". Click Re-download to update"))
                 }
                 return
             }
 
             if hasLocalModel {
-                completion(false, "本地模型没有版本记录；点「重新下载 / 更新」一次即可建立更新基准")
+                completion(false, tr("本地模型没有版本记录；点「重新下载 / 更新」一次即可建立更新基准", "No local version record — click Re-download once to set a baseline"))
             } else {
-                completion(false, "模型尚未下载；先点「下载模型」")
+                completion(false, tr("模型尚未下载；先点「下载模型」", "Model not downloaded yet — click Download first"))
             }
         }
     }
@@ -195,7 +195,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
             if let lastModified = lastModified, !lastModified.isEmpty {
                 return String(lastModified.prefix(10))
             }
-            return "未知"
+            return tr("未知", "unknown")
         }
     }
 
@@ -241,7 +241,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
 
     private func finishWithError(_ message: String) {
         isDownloading = false
-        statusText = "失败：\(message)"
+        statusText = tr("失败：", "Failed: ") + message
         session?.finishTasksAndInvalidate()
         session = nil
     }
@@ -256,7 +256,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
         progress = min(1, Double(done) / Double(totalBytes))
         let doneMB = Double(done) / 1_048_576
         let totalMB = Double(totalBytes) / 1_048_576
-        statusText = String(format: "下载中 (%d/%d) %.0f / %.0f MB",
+        statusText = String(format: tr("下载中 (%d/%d) %.0f / %.0f MB", "Downloading (%d/%d) %.0f / %.0f MB"),
                             fileIndex + 1, files.count, doneMB, totalMB)
     }
 
@@ -275,7 +275,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
         do {
             try FileManager.default.moveItem(at: location, to: dest)
         } catch {
-            finishWithError("保存失败：\(error.localizedDescription)")
+            finishWithError(tr("保存失败：", "Save failed: ") + error.localizedDescription)
             return
         }
         completedBytes += max(file.size, 0)
@@ -296,7 +296,7 @@ final class QwenModelDownloader: NSObject, ObservableObject, URLSessionDownloadD
             hostIndex += 1
             downloadNextFile()
         } else {
-            finishWithError("下载源均失败，请检查网络后重试（已完成的文件会保留，重试可续传）")
+            finishWithError(tr("下载源均失败，请检查网络后重试（已完成的文件会保留，重试可续传）", "All mirrors failed — check your network and retry (completed files are kept; retry resumes)"))
         }
     }
 }

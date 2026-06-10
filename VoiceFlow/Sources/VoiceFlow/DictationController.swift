@@ -100,7 +100,8 @@ final class DictationController {
     private func startRecording(skill: Bool = false) {
         // 检查模型
         guard QwenEngine.shared.isModelAvailable else {
-            overlay.flashError("识别模型未下载，请在设置中下载")
+            overlay.flashError(tr("识别模型未下载，请在设置中下载",
+                                  "Speech model not downloaded — see Settings"))
             Sounds.playError()
             onNeedSettings?()
             return
@@ -109,7 +110,8 @@ final class DictationController {
         guard Permissions.isAccessibilityTrusted else {
             didPromptAccessibility = true
             Permissions.promptAccessibility()
-            overlay.flashError("请先开启辅助功能权限，然后重启 VoiceFlow")
+            overlay.flashError(tr("请先开启辅助功能权限，然后重启 VoiceFlow",
+                                  "Enable Accessibility permission, then restart VoiceFlow"))
             Sounds.playError()
             return
         }
@@ -118,7 +120,8 @@ final class DictationController {
         Permissions.ensureMicrophone { [weak self] granted in
             guard let self = self else { return }
             guard granted else {
-                self.overlay.flashError("没有麦克风权限，请在 系统设置 → 隐私 中开启")
+                self.overlay.flashError(tr("没有麦克风权限，请在 系统设置 → 隐私 中开启",
+                                           "No microphone access — enable it in System Settings → Privacy"))
                 Sounds.playError()
                 Permissions.openMicrophoneSettings()
                 return
@@ -126,7 +129,8 @@ final class DictationController {
             // 首次授权会弹系统窗口并打断焦点，授权期间这一次输入不可靠；
             // 统一让用户再触发一次，避免"历史里有但没粘贴进输入框"。
             if !alreadyAuthorized {
-                self.overlay.flashSuccess("麦克风已授权，请再按一次开始")
+                self.overlay.flashSuccess(tr("麦克风已授权，请再按一次开始",
+                                             "Microphone granted — press once more to start"))
                 Sounds.playSuccess()
                 return
             }
@@ -159,7 +163,8 @@ final class DictationController {
                 return
             }
             self.phase = .recording
-            self.overlay.showRecording(label: skill ? "正在听指令…" : "正在听…")
+            self.overlay.showRecording(label: skill ? tr("正在听指令…", "Listening for command…")
+                                                    : tr("正在听…", "Listening…"))
             Sounds.playStart()
         }
     }
@@ -177,7 +182,7 @@ final class DictationController {
         }
 
         phase = .processing
-        overlay.showProcessing("识别中…")
+        overlay.showProcessing(tr("识别中…", "Transcribing…"))
         let tStart = Date()
         let isColdStart = !QwenEngine.shared.isModelReady
 
@@ -192,7 +197,7 @@ final class DictationController {
             case .success(let rawText):
                 guard !rawText.isEmpty else {
                     self.phase = .idle
-                    self.overlay.flashError("没有听到内容")
+                    self.overlay.flashError(tr("没有听到内容", "Nothing heard"))
                     return
                 }
                 // 指令模式：这次说的话就是命令。普通输入永远不做指令解析。
@@ -207,7 +212,7 @@ final class DictationController {
                     level = Self.smartLevel(for: self.targetBundleID, fallback: level)
                 }
                 if level != .off, KeychainHelper.loadAPIKey() != nil {
-                    var label = "润色中…"
+                    var label = tr("润色中…", "Polishing…")
                     if Settings.shared.smartLevelEnabled, !self.targetAppName.isEmpty {
                         label += "（\(self.targetAppName)）"
                     }
@@ -217,20 +222,25 @@ final class DictationController {
                     PolishService.polish(rawText, level: level, scene: scene) { [weak self] polished, failure in
                         guard let self = self else { return }
                         let polishSeconds = Date().timeIntervalSince(tPolish)
-                        let timing = String(format: "识别 %.1fs · 润色 %.1fs", asrSeconds, polishSeconds)
+                        let timing = String(format: tr("识别 %.1fs · 润色 %.1fs", "ASR %.1fs · polish %.1fs"),
+                                            asrSeconds, polishSeconds)
                         if let polished = polished {
-                            self.deliver(raw: rawText, final: polished, note: "已输入（\(timing)）",
+                            self.deliver(raw: rawText, final: polished,
+                                         note: tr("已输入（", "Inserted (") + timing + tr("）", ")"),
                                          allowClipboardRestore: !isColdStart)
                         } else {
                             self.deliver(raw: rawText, final: rawText,
-                                         note: "润色失败（\(failure ?? "未知")），已输出识别原文",
+                                         note: tr("润色失败（", "Polish failed (")
+                                             + (failure ?? tr("未知", "unknown"))
+                                             + tr("），已输出识别原文", ") — raw transcript inserted"),
                                          warning: true,
                                          allowClipboardRestore: !isColdStart)
                         }
                     }
                 } else {
-                    let timing = String(format: "识别 %.1fs", asrSeconds)
-                    self.deliver(raw: rawText, final: rawText, note: "已输入（\(timing)）",
+                    let timing = String(format: tr("识别 %.1fs", "ASR %.1fs"), asrSeconds)
+                    self.deliver(raw: rawText, final: rawText,
+                                 note: tr("已输入（", "Inserted (") + timing + tr("）", ")"),
                                  allowClipboardRestore: !isColdStart)
                 }
             }
@@ -255,16 +265,16 @@ final class DictationController {
 
     /// 技能：自由指令——指令模式下的"万能入口"
     private func runFreeform(instruction: String, raw: String, isColdStart: Bool) {
-        overlay.showProcessing("执行指令中…")
+        overlay.showProcessing(tr("执行指令中…", "Running command…"))
         let scene = SceneClassifier.scene(for: targetBundleID)
         AgentService.freeform(instruction: instruction, scene: scene) { [weak self] result, failure in
             guard let self = self else { return }
             if let result = result {
-                self.deliver(raw: raw, final: result, note: "已输入指令结果",
+                self.deliver(raw: raw, final: result, note: tr("已输入指令结果", "Command result inserted"),
                              allowClipboardRestore: !isColdStart)
             } else {
                 self.phase = .idle
-                self.overlay.flashError("指令执行失败（\(failure ?? "未知")）")
+                self.overlay.flashError(tr("指令执行失败（", "Command failed (") + (failure ?? tr("未知", "unknown")) + tr("）", ")"))
                 Sounds.playError()
             }
         }
@@ -274,19 +284,19 @@ final class DictationController {
     private func runModifySelection(instruction: String, raw: String, isColdStart: Bool) {
         guard let selection = targetSelection else {
             phase = .idle
-            overlay.flashError("没有读到选中文本")
+            overlay.flashError(tr("没有读到选中文本", "Could not read selected text"))
             Sounds.playError()
             return
         }
-        overlay.showProcessing("执行指令中…")
+        overlay.showProcessing(tr("执行指令中…", "Running command…"))
         AgentService.modifySelection(selection, instruction: instruction) { [weak self] result, failure in
             guard let self = self else { return }
             if let result = result {
-                self.deliver(raw: raw, final: result, note: "已替换选中文本",
+                self.deliver(raw: raw, final: result, note: tr("已替换选中文本", "Selection replaced"),
                              allowClipboardRestore: !isColdStart)
             } else {
                 self.phase = .idle
-                self.overlay.flashError("指令执行失败（\(failure ?? "未知")）")
+                self.overlay.flashError(tr("指令执行失败（", "Command failed (") + (failure ?? tr("未知", "unknown")) + tr("）", ")"))
                 Sounds.playError()
             }
         }
@@ -300,12 +310,12 @@ final class DictationController {
             return
         }
         // AX 没读到：此刻焦点仍在目标应用、选区还在，用 ⌘C 兜底再试一次
-        overlay.showProcessing("读取选中内容…")
+        overlay.showProcessing(tr("读取选中内容…", "Reading selection…"))
         SelectionReader.readSelectedTextWithClipboardFallback { [weak self] context in
             guard let self = self else { return }
             guard let context = context else {
                 self.phase = .idle
-                self.overlay.flashError("读不到选中内容：请重新选中要回复的消息再试")
+                self.overlay.flashError(tr("读不到选中内容：请重新选中要回复的消息再试", "Could not read selection — reselect the message and try again"))
                 Sounds.playError()
                 return
             }
@@ -314,7 +324,7 @@ final class DictationController {
     }
 
     private func executeReplyDraft(context: String, instruction: String, raw: String) {
-        overlay.showProcessing("草拟回复中…")
+        overlay.showProcessing(tr("草拟回复中…", "Drafting reply…"))
         let scene = SceneClassifier.scene(for: targetBundleID)
         AgentService.replyDraft(context: context, instruction: instruction, scene: scene) { [weak self] result, failure in
             guard let self = self else { return }
@@ -325,10 +335,10 @@ final class DictationController {
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.setString(final, forType: .string)
-                self.overlay.flashSuccess("回复草稿已复制——点到输入框按 ⌘V")
+                self.overlay.flashSuccess(tr("回复草稿已复制——点到输入框按 ⌘V", "Reply draft copied — click the input field and press ⌘V"))
                 Sounds.playSuccess()
             } else {
-                self.overlay.flashError("草拟失败（\(failure ?? "未知")）")
+                self.overlay.flashError(tr("草拟失败（", "Draft failed (") + (failure ?? tr("未知", "unknown")) + tr("）", ")"))
                 Sounds.playError()
             }
         }
@@ -352,7 +362,7 @@ final class DictationController {
                 }
                 Sounds.playSuccess()
             case .clipboardOnly:
-                self.overlay.flashError("窗口已切换，文本已复制到剪贴板——按 ⌘V 粘贴")
+                self.overlay.flashError(tr("窗口已切换，文本已复制到剪贴板——按 ⌘V 粘贴", "Window changed — text copied to clipboard, press ⌘V to paste"))
                 Sounds.playError()
             }
         }

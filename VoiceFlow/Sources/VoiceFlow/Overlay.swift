@@ -122,7 +122,7 @@ final class OverlayController {
         p.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
-    func showRecording(label: String = "正在听…") {
+    func showRecording(label: String = tr("正在听…", "Listening…")) {
         hideGeneration += 1
         state.resetLevels()
         state.mode = .recording(label)

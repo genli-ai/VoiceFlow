@@ -57,10 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             button.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "VoiceFlow")
             button.contentTintColor = nil
         case .recording:
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "录音中")
+            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: tr("录音中", "Recording"))
             button.contentTintColor = .systemRed
         case .processing:
-            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "处理中")
+            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: tr("处理中", "Processing"))
             button.contentTintColor = .systemOrange
         }
     }
@@ -69,19 +69,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
 
         let hotkeyName = Settings.shared.hotkey.shortSymbol
-        let modeHint = Settings.shared.triggerMode == .toggle ? "轻点 \(hotkeyName) 开始/结束听写" : "按住 \(hotkeyName) 说话"
+        let modeHint = Settings.shared.triggerMode == .toggle ? tr("轻点 ", "Tap ") + hotkeyName + tr(" 听写 · 按住说指令", " to dictate · hold for commands") : tr("按住 ", "Hold ") + hotkeyName + tr(" 说话", " to talk")
         let titleItem = NSMenuItem(title: modeHint, action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
 
         switch dictation.phase {
         case .idle:
-            menu.addItem(makeItem("开始听写", #selector(toggleDictation)))
+            menu.addItem(makeItem(tr("开始听写", "Start Dictation"), #selector(toggleDictation)))
         case .recording:
-            menu.addItem(makeItem("停止并输出", #selector(toggleDictation)))
-            menu.addItem(makeItem("取消录音（Esc）", #selector(cancelDictation)))
+            menu.addItem(makeItem(tr("停止并输出", "Stop & Insert"), #selector(toggleDictation)))
+            menu.addItem(makeItem(tr("取消录音（Esc）", "Cancel Recording (Esc)"), #selector(cancelDictation)))
         case .processing:
-            let item = NSMenuItem(title: "处理中…", action: nil, keyEquivalent: "")
+            let item = NSMenuItem(title: tr("处理中…", "Processing…"), action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         }
@@ -89,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
 
         // 润色档位
-        let levelItem = NSMenuItem(title: "润色档位", action: nil, keyEquivalent: "")
+        let levelItem = NSMenuItem(title: tr("润色档位", "Polish Mode"), action: nil, keyEquivalent: "")
         let levelMenu = NSMenu()
         let current = Settings.shared.polishLevel
         for level in PolishLevel.allCases {
@@ -103,11 +103,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(levelItem)
 
         // 历史记录
-        let historyItem = NSMenuItem(title: "最近记录", action: nil, keyEquivalent: "")
+        let historyItem = NSMenuItem(title: tr("最近记录", "Recent Transcripts"), action: nil, keyEquivalent: "")
         let historyMenu = NSMenu()
         let items = HistoryStore.shared.items
         if items.isEmpty {
-            let empty = NSMenuItem(title: "（暂无）", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: tr("（暂无）", "(empty)"), action: nil, keyEquivalent: "")
             empty.isEnabled = false
             historyMenu.addItem(empty)
         } else {
@@ -119,11 +119,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let mi = NSMenuItem(title: title, action: #selector(copyHistory(_:)), keyEquivalent: "")
                 mi.target = self
                 mi.representedObject = item.polished
-                mi.toolTip = "点击复制全文"
+                mi.toolTip = tr("点击复制全文", "Click to copy")
                 historyMenu.addItem(mi)
             }
             historyMenu.addItem(.separator())
-            historyMenu.addItem(makeItem("清空记录", #selector(clearHistory)))
+            historyMenu.addItem(makeItem(tr("清空记录", "Clear History"), #selector(clearHistory)))
         }
         historyItem.submenu = historyMenu
         menu.addItem(historyItem)
@@ -131,17 +131,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
 
         if QwenEngine.shared.isModelLoaded {
-            menu.addItem(makeItem("释放模型内存", #selector(unloadModel)))
+            menu.addItem(makeItem(tr("释放模型内存", "Free Model Memory"), #selector(unloadModel)))
         }
 
-        let settingsItem = makeItem("设置…", #selector(openSettings))
+        let settingsItem = makeItem(tr("设置…", "Settings…"), #selector(openSettings))
         settingsItem.keyEquivalent = ","
         settingsItem.keyEquivalentModifierMask = .command
         menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
-        let quitItem = makeItem("退出 VoiceFlow", #selector(quit))
+        let quitItem = makeItem(tr("退出 VoiceFlow", "Quit VoiceFlow"), #selector(quit))
         quitItem.keyEquivalent = "q"
         quitItem.keyEquivalentModifierMask = .command
         menu.addItem(quitItem)

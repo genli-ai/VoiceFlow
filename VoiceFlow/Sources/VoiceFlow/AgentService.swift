@@ -21,13 +21,13 @@ enum LLMClient {
                      timeout: TimeInterval,
                      completion: @escaping (String?, String?) -> Void) {
         guard let apiKey = KeychainHelper.loadAPIKey() else {
-            DispatchQueue.main.async { completion(nil, "未配置 API Key") }
+            DispatchQueue.main.async { completion(nil, tr("未配置 API Key", "No API key configured")) }
             return
         }
         var base = Settings.shared.currentBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if base.hasSuffix("/") { base = String(base.dropLast()) }
         guard let url = URL(string: base + "/chat/completions") else {
-            DispatchQueue.main.async { completion(nil, "Base URL 格式不对") }
+            DispatchQueue.main.async { completion(nil, tr("Base URL 格式不对", "Invalid base URL")) }
             return
         }
 
@@ -61,8 +61,8 @@ enum LLMClient {
                     return
                 }
                 failure = nsError.code == NSURLErrorTimedOut
-                    ? "请求超时（已重试，网络到 API 太慢）"
-                    : error.localizedDescription + "（已重试）"
+                    ? tr("请求超时（已重试，网络到 API 太慢）", "Request timed out (retried — network to the API is slow)")
+                    : error.localizedDescription + tr("（已重试）", " (retried)")
             } else if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                 var detail = ""
                 if let data = data,
@@ -72,10 +72,10 @@ enum LLMClient {
                     detail = "：" + String(msg.prefix(60))
                 }
                 switch http.statusCode {
-                case 401: failure = "API Key 无效 (401)" + detail
-                case 404: failure = "模型名不存在 (404)" + detail
-                case 429: failure = "限流或余额不足 (429)" + detail
-                default: failure = "接口返回 \(http.statusCode)" + detail
+                case 401: failure = tr("API Key 无效 (401)", "Invalid API key (401)") + detail
+                case 404: failure = tr("模型名不存在 (404)", "Model not found (404)") + detail
+                case 429: failure = tr("限流或余额不足 (429)", "Rate limited or out of credit (429)") + detail
+                default: failure = tr("接口返回 ", "API returned ") + "\(http.statusCode)" + detail
                 }
             } else if let data = data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -84,12 +84,12 @@ enum LLMClient {
                       let content = message["content"] as? String {
                 let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed.isEmpty {
-                    failure = "模型返回了空内容"
+                    failure = tr("模型返回了空内容", "Model returned empty content")
                 } else {
                     result = trimmed
                 }
             } else {
-                failure = "返回格式无法解析"
+                failure = tr("返回格式无法解析", "Could not parse the response")
             }
             DispatchQueue.main.async { completion(result, failure) }
         }

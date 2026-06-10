@@ -25,17 +25,17 @@ enum HotkeyChoice: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .rightOption: return "右 Option (⌥)"
-        case .rightCommand: return "右 Command (⌘)"
-        case .rightControl: return "右 Control (⌃)"
+        case .rightOption: return tr("右 Option (⌥)", "Right Option (⌥)")
+        case .rightCommand: return tr("右 Command (⌘)", "Right Command (⌘)")
+        case .rightControl: return tr("右 Control (⌃)", "Right Control (⌃)")
         }
     }
 
     var shortSymbol: String {
         switch self {
-        case .rightOption: return "右⌥"
-        case .rightCommand: return "右⌘"
-        case .rightControl: return "右⌃"
+        case .rightOption: return tr("右⌥", "R⌥")
+        case .rightCommand: return tr("右⌘", "R⌘")
+        case .rightControl: return tr("右⌃", "R⌃")
         }
     }
 }
@@ -48,8 +48,8 @@ enum TriggerMode: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .toggle: return "按一下开始 / 再按结束"
-        case .hold: return "按住说话，松开结束"
+        case .toggle: return tr("按一下开始 / 再按结束", "Tap to start / tap to stop")
+        case .hold: return tr("按住说话，松开结束", "Hold to talk, release to stop")
         }
     }
 }
@@ -62,8 +62,10 @@ enum PolishLevel: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .off: return "仅识别（最快，完全不联网）"
-        case .smart: return "AI 润色（自适应：短句轻清理，长口述自动重构）"
+        case .off: return tr("仅识别（最快，完全不联网）",
+                             "Transcribe only (fastest, fully offline)")
+        case .smart: return tr("AI 润色（自适应：短句轻清理，长口述自动重构）",
+                               "AI polish (adaptive: light cleanup or full restructuring)")
         }
     }
 }
@@ -116,6 +118,7 @@ enum SettingsKeys {
     static let smartLevel = "smartLevel"
     static let qwenModelRepo = "qwenModelRepo"
     static let llmProvider = "llmProvider"
+    static let appLanguage = "appLanguage"
     static let deepseekBaseURL = "deepseekBaseURL"
     static let deepseekModel = "deepseekModel"
     static let skillsEnabled = "skillsEnabled"

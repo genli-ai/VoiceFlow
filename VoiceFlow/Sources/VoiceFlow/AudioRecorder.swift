@@ -22,16 +22,16 @@ final class AudioRecorder {
         let inFormat = input.outputFormat(forBus: 0)
 
         guard inFormat.sampleRate > 0, inFormat.channelCount > 0 else {
-            throw VFError("没有可用的麦克风输入设备")
+            throw VFError(tr("没有可用的麦克风输入设备", "No microphone input device available"))
         }
         guard let outFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
                                             sampleRate: 16000,
                                             channels: 1,
                                             interleaved: false) else {
-            throw VFError("无法创建音频格式")
+            throw VFError(tr("无法创建音频格式", "Could not create audio format"))
         }
         guard let converter = AVAudioConverter(from: inFormat, to: outFormat) else {
-            throw VFError("无法创建音频转换器")
+            throw VFError(tr("无法创建音频转换器", "Could not create audio converter"))
         }
 
         lock.lock()
@@ -54,7 +54,7 @@ final class AudioRecorder {
             self.engine = nil
             self.converter = nil
             self.outFormat = nil
-            throw VFError("无法启动录音：\(error.localizedDescription)")
+            throw VFError(tr("无法启动录音：", "Could not start recording: ") + error.localizedDescription)
         }
 
         isRecording = true

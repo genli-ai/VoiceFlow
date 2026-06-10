@@ -13,13 +13,13 @@ final class SettingsWindowController {
         if window == nil {
             let hosting = NSHostingController(rootView: SettingsView())
             let w = NSWindow(contentViewController: hosting)
-            w.title = "VoiceFlow 设置"
             w.styleMask = [.titled, .closable, .miniaturizable]
             w.isReleasedWhenClosed = false
-            w.setContentSize(NSSize(width: 560, height: 480))
+            w.setContentSize(NSSize(width: 560, height: 500))
             w.center()
             window = w
         }
+        window?.title = tr("VoiceFlow 设置", "VoiceFlow Settings")
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
@@ -28,24 +28,27 @@ final class SettingsWindowController {
 // MARK: - 设置界面
 
 struct SettingsView: View {
+    @ObservedObject private var l10n = L10n.shared
+
     var body: some View {
         TabView {
             GeneralTab()
-                .tabItem { Label("通用", systemImage: "gearshape") }
+                .tabItem { Label(tr("通用", "General"), systemImage: "gearshape") }
             RecognitionTab()
-                .tabItem { Label("识别", systemImage: "waveform") }
+                .tabItem { Label(tr("识别", "Recognition"), systemImage: "waveform") }
             PolishTab()
-                .tabItem { Label("AI 润色", systemImage: "wand.and.stars") }
+                .tabItem { Label(tr("AI 润色", "AI Polish"), systemImage: "wand.and.stars") }
             AboutTab()
-                .tabItem { Label("关于", systemImage: "info.circle") }
+                .tabItem { Label(tr("关于", "About"), systemImage: "info.circle") }
         }
-        .frame(width: 560, height: 480)
+        .frame(width: 560, height: 500)
     }
 }
 
 // MARK: - 通用
 
 private struct GeneralTab: View {
+    @ObservedObject private var l10n = L10n.shared
     @AppStorage(SettingsKeys.hotkey) private var hotkey = HotkeyChoice.rightOption.rawValue
     @AppStorage(SettingsKeys.triggerMode) private var triggerMode = TriggerMode.toggle.rawValue
     @AppStorage(SettingsKeys.playSounds) private var playSounds = true
@@ -58,25 +61,34 @@ private struct GeneralTab: View {
     var body: some View {
         Form {
             Section {
-                Picker("听写快捷键：", selection: $hotkey) {
+                Picker(tr("界面语言 / Language:", "Language / 界面语言:"), selection: $l10n.language) {
+                    ForEach(AppLanguage.allCases, id: \.self) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section {
+                Picker(tr("听写快捷键：", "Dictation hotkey:"), selection: $hotkey) {
                     ForEach(HotkeyChoice.allCases, id: \.rawValue) { choice in
                         Text(choice.displayName).tag(choice.rawValue)
                     }
                 }
-                Picker("触发方式：", selection: $triggerMode) {
+                Picker(tr("触发方式：", "Trigger:"), selection: $triggerMode) {
                     ForEach(TriggerMode.allCases, id: \.rawValue) { mode in
                         Text(mode.displayName).tag(mode.rawValue)
                     }
                 }
-                Text("录音中按 Esc 可随时取消。")
+                Text(tr("录音中按 Esc 可随时取消。", "Press Esc anytime to cancel recording."))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Section {
-                Toggle("开始 / 完成时播放提示音", isOn: $playSounds)
-                Toggle("输入后恢复原剪贴板内容", isOn: $restoreClipboard)
-                Toggle("登录时自动启动", isOn: $launchAtLogin)
+                Toggle(tr("开始 / 完成时播放提示音", "Play sounds on start / finish"), isOn: $playSounds)
+                Toggle(tr("输入后恢复原剪贴板内容", "Restore clipboard after inserting"), isOn: $restoreClipboard)
+                Toggle(tr("登录时自动启动", "Launch at login"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in
                         do {
                             if newValue {
@@ -92,11 +104,11 @@ private struct GeneralTab: View {
 
             Section {
                 HStack {
-                    Text("权限：")
-                    PermissionBadge(name: "麦克风", ok: micOK)
-                    PermissionBadge(name: "辅助功能", ok: axOK)
+                    Text(tr("权限：", "Permissions:"))
+                    PermissionBadge(name: tr("麦克风", "Microphone"), ok: micOK)
+                    PermissionBadge(name: tr("辅助功能", "Accessibility"), ok: axOK)
                     Spacer()
-                    Button("打开系统设置") {
+                    Button(tr("打开系统设置", "Open System Settings")) {
                         Permissions.openAccessibilitySettings()
                     }
                 }
@@ -104,11 +116,13 @@ private struct GeneralTab: View {
                     micOK = Permissions.microphoneGranted
                     axOK = Permissions.isAccessibilityTrusted
                 }
-                Text("「辅助功能」权限用于监听快捷键和把文字粘贴到光标处，必须开启。")
+                Text(tr("「辅助功能」权限用于监听快捷键和把文字粘贴到光标处，必须开启。",
+                        "Accessibility is required for the global hotkey and for pasting text at the cursor."))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 if !axOK {
-                    Text("如果系统设置里显示已开启但这里仍是 ✗：是旧版授权失效了。请在 辅助功能 列表中选中 VoiceFlow，点「−」删除，再点「+」重新添加 /Applications/VoiceFlow.app。")
+                    Text(tr("如果系统设置里显示已开启但这里仍是 ✗：是旧版授权失效了。请在 辅助功能 列表中选中 VoiceFlow，点「−」删除，再点「+」重新添加。",
+                            "If System Settings shows it enabled but this still shows ✗, the old grant is stale: remove VoiceFlow from the Accessibility list (−), then add it back (+)."))
                         .font(.caption)
                         .foregroundColor(.orange)
                 }
@@ -135,6 +149,7 @@ private struct PermissionBadge: View {
 // MARK: - 识别（Qwen3-ASR）
 
 private struct RecognitionTab: View {
+    @ObservedObject private var l10n = L10n.shared
     @AppStorage(SettingsKeys.qwenModelRepo) private var qwenRepo = QwenModels.defaultRepo
     @AppStorage(SettingsKeys.customVocabulary) private var vocabulary = ""
     @ObservedObject private var downloader = QwenModelDownloader.shared
@@ -151,7 +166,7 @@ private struct RecognitionTab: View {
     var body: some View {
         Form {
             Section {
-                Picker("识别模型：", selection: $qwenRepo) {
+                Picker(tr("识别模型：", "Speech model:"), selection: $qwenRepo) {
                     ForEach(QwenModels.all, id: \.repo) { m in
                         Text("\(m.title) · \(m.sizeNote)").tag(m.repo)
                     }
@@ -159,17 +174,19 @@ private struct RecognitionTab: View {
                 HStack {
                     Image(systemName: modelExists ? "checkmark.circle.fill" : "arrow.down.circle")
                         .foregroundColor(modelExists ? .green : .orange)
-                    Text(modelExists ? "模型已就绪" : "模型未下载")
+                    Text(modelExists ? tr("模型已就绪", "Model ready")
+                                     : tr("模型未下载", "Model not downloaded"))
                     Spacer()
                     if downloader.isDownloading {
-                        Button("取消") { downloader.cancel() }
+                        Button(tr("取消", "Cancel")) { downloader.cancel() }
                     } else {
-                        Button(modelExists ? "重新下载 / 更新" : "下载模型") {
+                        Button(modelExists ? tr("重新下载 / 更新", "Re-download / Update")
+                                           : tr("下载模型", "Download Model")) {
                             updateMessage = ""
                             QwenEngine.shared.unloadModel()
                             downloader.download(repo: qwenRepo, force: modelExists)
                         }
-                        Button(checkingUpdate ? "检查中…" : "检查更新") {
+                        Button(checkingUpdate ? tr("检查中…", "Checking…") : tr("检查更新", "Check Updates")) {
                             checkingUpdate = true
                             updateMessage = ""
                             QwenModelDownloader.checkForUpdate(repo: qwenRepo) { _, message in
@@ -191,24 +208,24 @@ private struct RecognitionTab: View {
                 if !updateMessage.isEmpty {
                     Text(updateMessage)
                         .font(.caption)
-                        .foregroundColor(updateMessage.contains("发现新版本") ? .orange : .secondary)
+                        .foregroundColor(updateMessage.contains(tr("发现新版本", "Update available")) ? .orange : .secondary)
                 }
-                Text("Qwen3-ASR（2026）：约 30 种语言 + 22 种中文方言，自动检测语言，识别完全在本机进行。模型来自 HuggingFace（hf-mirror 加速）。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text("「检查更新」会对比远端仓库版本；发现新版本后点「重新下载 / 更新」即可。专有词汇表是你的本地热词，修改后下次识别立刻生效。")
+                Text(tr("Qwen3-ASR（2026）：约 30 种语言 + 22 种中文方言，自动检测语言，识别完全在本机进行。模型来自 HuggingFace（hf-mirror 加速）。",
+                        "Qwen3-ASR (2026): ~30 languages + 22 Chinese dialects, automatic language detection, fully on-device. Models from HuggingFace."))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Section {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("专有词汇表（人名、品牌、术语等，用逗号或换行分隔）：")
+                    Text(tr("专有词汇表（人名、品牌、术语等，用逗号或换行分隔）：",
+                            "Custom vocabulary (names, brands, jargon — comma or newline separated):"))
                     TextEditor(text: $vocabulary)
                         .font(.system(size: 12))
                         .frame(height: 80)
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.3)))
-                    Text("这些词会作为热词直接送入识别模型，并参与 AI 润色纠错——专有名词识别准确率的第一杠杆，强烈建议填写。")
+                    Text(tr("这些词会作为热词直接送入识别模型，并参与 AI 润色纠错——专有名词识别准确率的第一杠杆，强烈建议填写。",
+                            "These terms are fed to the speech model as hotwords and used by AI polish — the #1 lever for proper-noun accuracy."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -230,6 +247,7 @@ private struct RecognitionTab: View {
 // MARK: - AI 润色
 
 private struct PolishTab: View {
+    @ObservedObject private var l10n = L10n.shared
     @AppStorage(SettingsKeys.polishLevel) private var polishLevel = PolishLevel.smart.rawValue
     @AppStorage(SettingsKeys.smartLevel) private var smartLevel = false
     @AppStorage(SettingsKeys.skillsEnabled) private var skillsEnabled = true
@@ -248,43 +266,45 @@ private struct PolishTab: View {
     var body: some View {
         Form {
             Section {
-                Picker("润色档位：", selection: $polishLevel) {
+                Picker(tr("润色档位：", "Polish mode:"), selection: $polishLevel) {
                     ForEach(PolishLevel.allCases, id: \.rawValue) { level in
                         Text(level.displayName).tag(level.rawValue)
                     }
                 }
                 .pickerStyle(.radioGroup)
-                Text("「仅识别」完全不联网；「AI 润色」自适应处理力度——短句只做轻清理（去语气词、修错字），长段混乱口述自动重构成可直接使用的成品文字，并按目标应用（聊天/邮件/文档）适配风格。菜单栏图标里可以快速切换。")
+                Text(tr("「仅识别」完全不联网；「AI 润色」自适应处理力度——短句只做轻清理（去语气词、修错字），长段混乱口述自动重构成可直接使用的成品文字，并按目标应用（聊天/邮件/文档）适配风格。菜单栏图标里可以快速切换。",
+                        "Transcribe-only never touches the network. AI polish adapts: short phrases get light cleanup (fillers, typos); long rambling speech gets restructured into ready-to-use text, styled for the target app (chat/email/document). Switch quickly from the menu bar."))
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Toggle("代码工具自动仅识别", isOn: $smartLevel)
-                Text("在代码编辑器和终端（VS Code/Xcode/Terminal 等）里自动切为仅识别，避免润色干扰技术内容。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section {
-                Toggle("语音技能（V3 实验）", isOn: $skillsEnabled)
-                Text("意图靠手势区分，永不误判：轻点快捷键 = 纯语音输入，说什么打什么；按住快捷键说话、松手执行 = 指令模式——选中文字后按住说「改正式一点 / 翻译成英文」直接替换选区；选中对方消息后按住说「帮我回复，就说我周五有空」，草稿复制到剪贴板。（触发方式为「按住说话」时暂无指令手势）")
+                Toggle(tr("代码工具自动仅识别", "Transcribe-only in code tools"), isOn: $smartLevel)
+                Text(tr("在代码编辑器和终端（VS Code/Xcode/Terminal 等）里自动切为仅识别，避免润色干扰技术内容。",
+                        "Automatically switch to transcribe-only in code editors and terminals (VS Code/Xcode/Terminal) so polish never touches technical content."))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Section {
-                Picker("当前使用：", selection: $provider) {
+                Toggle(tr("语音技能（V3 实验）", "Voice commands (V3 Lab)"), isOn: $skillsEnabled)
+                Text(tr("意图靠手势区分，永不误判：轻点快捷键 = 纯语音输入，说什么打什么；按住快捷键说话、松手执行 = 指令模式——选中文字后按住说「改正式一点 / 翻译成英文」直接替换选区；选中对方消息后按住说「帮我回复…」草稿进剪贴板；什么都没选就是自由指令（草拟邮件、翻译、提问）。",
+                        "Intent is decided by gesture, never by guessing: tap = pure dictation, whatever you say gets typed. Hold = command mode — with text selected, say \"make it formal / translate to English\" to replace the selection; with a message selected, say \"help me reply…\" to get a draft on the clipboard; with nothing selected it's a free-form command (draft an email, translate, ask anything)."))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
+                Picker(tr("当前使用：", "Active provider:"), selection: $provider) {
                     ForEach(LLMProvider.allCases, id: \.rawValue) { p in
                         Text(p.displayName).tag(p.rawValue)
                     }
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: provider) { _, newValue in
-                    // 切换服务商：载入对应的 Key
                     let account = LLMProvider(rawValue: newValue)?.keychainAccount
                     apiKey = KeychainHelper.loadAPIKey(account: account) ?? ""
                     testResult = ""
                 }
                 HStack(spacing: 14) {
-                    Text("润色和语音指令将使用上方选中的服务商")
+                    Text(tr("润色和语音指令将使用上方选中的服务商", "Polish and voice commands use the provider selected above"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
@@ -292,17 +312,19 @@ private struct PolishTab: View {
                     KeyStatusBadge(name: "DeepSeek", saved: dsSaved)
                 }
                 SecureField(provider == LLMProvider.deepseek.rawValue
-                            ? "DeepSeek API Key（sk-…）" : "OpenAI API Key（sk-…）",
+                            ? tr("DeepSeek API Key（sk-…）", "DeepSeek API key (sk-…)")
+                            : tr("OpenAI API Key（sk-…）", "OpenAI API key (sk-…)"),
                             text: $apiKey)
                     .textFieldStyle(.roundedBorder)
                 HStack {
-                    Button("保存 Key") {
+                    Button(tr("保存 Key", "Save Key")) {
                         KeychainHelper.saveAPIKey(apiKey)
                         refreshSavedStates()
-                        testResult = (KeychainHelper.loadAPIKey() != nil) ? "已保存 ✓" : "已清空"
+                        testResult = (KeychainHelper.loadAPIKey() != nil)
+                            ? tr("已保存 ✓", "Saved ✓") : tr("已清空", "Cleared")
                     }
                     Spacer()
-                    Button(testing ? "测试中…" : "测试连接") {
+                    Button(testing ? tr("测试中…", "Testing…") : tr("测试连接", "Test Connection")) {
                         testing = true
                         testResult = ""
                         KeychainHelper.saveAPIKey(apiKey)
@@ -314,7 +336,8 @@ private struct PolishTab: View {
                     }
                     .disabled(testing)
                 }
-                Text("Key 加密保存在 macOS 系统钥匙串里（可在「钥匙串访问」App 中查看），仅本机可读，不写入任何明文文件。两个服务商的 Key 都可以保存，互不覆盖。")
+                Text(tr("Key 加密保存在 macOS 系统钥匙串里（可在「钥匙串访问」App 中查看），仅本机可读，不写入任何明文文件。两个服务商的 Key 都可以保存，互不覆盖。",
+                        "Keys are encrypted in the macOS Keychain (visible in the Keychain Access app), readable only on this Mac, never written to plain files. Both providers' keys can be saved independently."))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 if !testResult.isEmpty {
@@ -324,19 +347,21 @@ private struct PolishTab: View {
                         .lineLimit(3)
                 }
                 if provider == LLMProvider.deepseek.rawValue {
-                    TextField("Base URL", text: $dsBaseURL)
+                    TextField(tr("Base URL", "Base URL"), text: $dsBaseURL)
                         .textFieldStyle(.roundedBorder)
-                    TextField("模型名（如 deepseek-v4-flash）", text: $dsModel)
+                    TextField(tr("模型名（如 deepseek-v4-flash）", "Model (e.g. deepseek-v4-flash)"), text: $dsModel)
                         .textFieldStyle(.roundedBorder)
-                    Text("可选模型：deepseek-v4-flash（推荐，快且便宜）、deepseek-v4-pro（更强但更贵）。若响应偏慢，可改填 deepseek-chat（= flash 的非思考模式别名）。Key 在 platform.deepseek.com 申请。")
+                    Text(tr("可选模型：deepseek-v4-flash（推荐，快且便宜）、deepseek-v4-pro（更强但更贵）。若响应偏慢，可改填 deepseek-chat（= flash 的非思考模式别名）。Key 在 platform.deepseek.com 申请。",
+                            "Models: deepseek-v4-flash (recommended — fast and cheap) or deepseek-v4-pro (stronger, pricier). If responses feel slow, use deepseek-chat (alias of flash without thinking mode). Get a key at platform.deepseek.com."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    TextField("Base URL", text: $baseURL)
+                    TextField(tr("Base URL", "Base URL"), text: $baseURL)
                         .textFieldStyle(.roundedBorder)
-                    TextField("模型名（如 gpt-5.4-mini）", text: $chatModel)
+                    TextField(tr("模型名（如 gpt-5.4-mini）", "Model (e.g. gpt-5.4-mini)"), text: $chatModel)
                         .textFieldStyle(.roundedBorder)
-                    Text("默认 https://api.openai.com/v1 + gpt-5.4-mini（均衡）。极致速度换 gpt-5.4-nano，深度质量换 gpt-5.5；也可填任何 OpenAI 兼容中转。")
+                    Text(tr("默认 https://api.openai.com/v1 + gpt-5.4-mini（均衡）。极致速度换 gpt-5.4-nano，深度质量换 gpt-5.5；也可填任何 OpenAI 兼容中转。",
+                            "Defaults: https://api.openai.com/v1 + gpt-5.4-mini (balanced). Use gpt-5.4-nano for speed, gpt-5.5 for quality; any OpenAI-compatible endpoint works."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -344,12 +369,13 @@ private struct PolishTab: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("自定义润色规则（可选）：")
+                    Text(tr("自定义润色规则（可选）：", "Custom polish rules (optional):"))
                     TextEditor(text: $customRules)
                         .font(.system(size: 12))
                         .frame(height: 70)
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.3)))
-                    Text("例如：「邮件场景用正式语气」「英文术语保留原文不翻译」「数字用阿拉伯数字」。")
+                    Text(tr("例如：「邮件场景用正式语气」「英文术语保留原文不翻译」「数字用阿拉伯数字」。",
+                            "E.g. \"formal tone for emails\", \"keep English jargon untranslated\", \"use Arabic numerals\"."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -373,7 +399,7 @@ private struct KeyStatusBadge: View {
         HStack(spacing: 3) {
             Image(systemName: saved ? "key.fill" : "key")
                 .foregroundColor(saved ? .green : .secondary)
-            Text(name + (saved ? " ✓" : " 未填"))
+            Text(name + (saved ? " ✓" : tr(" 未填", " not set")))
         }
         .font(.caption)
         .foregroundColor(saved ? .primary : .secondary)
@@ -383,6 +409,8 @@ private struct KeyStatusBadge: View {
 // MARK: - 关于
 
 private struct AboutTab: View {
+    @ObservedObject private var l10n = L10n.shared
+
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "waveform.circle.fill")
@@ -390,16 +418,20 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("VoiceFlow")
                 .font(.title2.bold())
-            Text("版本 3.0.0-lab · Qwen3-ASR 引擎 + 语音技能")
+            Text(tr("版本 3.0.0-lab · Qwen3-ASR 引擎 + 语音技能",
+                    "Version 3.0.0-lab · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
-            Text("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。")
+            Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
+                    "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .font(.callout)
             Divider().padding(.horizontal, 60)
             VStack(spacing: 4) {
-                Text("隐私：录音和语音识别完全在本机进行。")
-                Text("只有开启 AI 润色时，识别出的文本会发送给你配置的大模型接口。")
+                Text(tr("隐私：录音和语音识别完全在本机进行。",
+                        "Privacy: recording and speech recognition stay entirely on this Mac."))
+                Text(tr("只有开启 AI 润色时，识别出的文本会发送给你配置的大模型接口。",
+                        "Only with AI polish enabled is the transcribed text sent to the model endpoint you configure."))
             }
             .font(.caption)
             .foregroundColor(.secondary)

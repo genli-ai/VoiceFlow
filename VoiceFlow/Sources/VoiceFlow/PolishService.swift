@@ -73,14 +73,14 @@ enum PolishService {
     /// 测试 API 连接。completion 在主线程回调 (是否成功, 提示信息)。
     static func test(completion: @escaping (Bool, String) -> Void) {
         guard KeychainHelper.loadAPIKey() != nil else {
-            completion(false, "还没有填 API Key")
+            completion(false, tr("还没有填 API Key", "No API key yet"))
             return
         }
         polish("测试，嗯，这是一条，呃，测试消息", level: .smart) { result, failure in
             if let r = result {
-                completion(true, "连接成功 ✓ 返回：\(r)")
+                completion(true, tr("连接成功 ✓ 返回：", "Connected ✓ Response: ") + r)
             } else {
-                completion(false, "连接失败——\(failure ?? "未知原因")")
+                completion(false, tr("连接失败——", "Connection failed — ") + (failure ?? tr("未知原因", "unknown")))
             }
         }
     }
