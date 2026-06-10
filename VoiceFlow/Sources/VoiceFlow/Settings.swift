@@ -125,6 +125,8 @@ enum SettingsKeys {
     static let modelFileName = "modelFileName"
     static let fastDecode = "fastDecode"
     static let smartLevel = "smartLevel"
+    static let engine = "engine"
+    static let qwenModelRepo = "qwenModelRepo"
 }
 
 // MARK: - 设置
@@ -149,6 +151,8 @@ final class Settings {
             SettingsKeys.modelFileName: WhisperModels.defaultFileName,
             SettingsKeys.fastDecode: false,
             SettingsKeys.smartLevel: false,
+            SettingsKeys.engine: EngineChoice.auto.rawValue,
+            SettingsKeys.qwenModelRepo: QwenModels.defaultRepo,
         ])
 
         // 一次性迁移：统一默认模型为 gpt-5.4-mini（质量与速度的平衡点）
@@ -240,6 +244,18 @@ final class Settings {
     var smartLevelEnabled: Bool {
         get { d.bool(forKey: SettingsKeys.smartLevel) }
         set { d.set(newValue, forKey: SettingsKeys.smartLevel) }
+    }
+
+    /// 识别引擎选择
+    var engine: EngineChoice {
+        get { EngineChoice(rawValue: d.string(forKey: SettingsKeys.engine) ?? "") ?? .auto }
+        set { d.set(newValue.rawValue, forKey: SettingsKeys.engine) }
+    }
+
+    /// Qwen 模型 HF 仓库 ID
+    var qwenModelRepo: String {
+        get { d.string(forKey: SettingsKeys.qwenModelRepo) ?? QwenModels.defaultRepo }
+        set { d.set(newValue, forKey: SettingsKeys.qwenModelRepo) }
     }
 
 }

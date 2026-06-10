@@ -28,6 +28,27 @@ enum Paths {
 // MARK: - 文本后处理
 
 enum TextPostProcessor {
+
+    /// 清理识别引擎的原始输出：去掉标记、折叠复读幻觉
+    static func cleanTranscript(_ text: String) -> String {
+        var t = text
+        // 去掉 [BLANK_AUDIO]、(字幕) 之类的标记
+        for pattern in ["\\[[^\\]]*\\]", "\\([^)]*\\)"] {
+            if let regex = try? NSRegularExpression(pattern: pattern) {
+                t = regex.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "")
+            }
+        }
+        // 折叠"复读机"式重复：同一短语连续出现 3 次以上时只保留一次
+        if let regex = try? NSRegularExpression(pattern: "(.{2,24}?)\\1{2,}", options: [.dotMatchesLineSeparators]) {
+            t = regex.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "$1")
+        }
+        // 整大段内容被原样复述一遍也只保留一次
+        if let regex = try? NSRegularExpression(pattern: "(.{12,400}?)\\1+", options: [.dotMatchesLineSeparators]) {
+            t = regex.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "$1")
+        }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// 中英混合标点修正：英文内容后面的全角标点改为半角（像豆包那样）
     /// 例：「to test。」→「to test.」  「iPhone，然后」→「iPhone, 然后」
     static func fixMixedPunctuation(_ text: String) -> String {

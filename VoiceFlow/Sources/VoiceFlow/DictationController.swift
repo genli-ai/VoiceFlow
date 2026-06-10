@@ -80,8 +80,8 @@ final class DictationController {
     // MARK: - 流程
 
     private func startRecording() {
-        // 检查模型
-        guard WhisperService.shared.isModelAvailable else {
+        // 检查当前引擎的模型
+        guard EngineRouter.current.isModelAvailable else {
             overlay.flashError("识别模型未下载，请在设置中下载")
             Sounds.playError()
             onNeedSettings?()
@@ -148,7 +148,7 @@ final class DictationController {
         overlay.showProcessing("识别中…")
         let tStart = Date()
 
-        WhisperService.shared.transcribe(samples: samples) { [weak self] result in
+        EngineRouter.current.transcribe(samples: samples) { [weak self] result in
             guard let self = self else { return }
             let asrSeconds = Date().timeIntervalSince(tStart)
             switch result {

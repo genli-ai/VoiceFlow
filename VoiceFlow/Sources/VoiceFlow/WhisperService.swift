@@ -173,29 +173,9 @@ final class WhisperService {
                 i += 1
             }
 
-            let cleaned = Self.cleanup(text)
+            let cleaned = TextPostProcessor.cleanTranscript(text)
             finish(.success(cleaned))
         }
-    }
-
-    /// 去掉 whisper 偶尔输出的标记和幻觉片段
-    private static func cleanup(_ text: String) -> String {
-        var t = text
-        // 去掉 [BLANK_AUDIO]、(字幕) 之类的标记
-        for pattern in ["\\[[^\\]]*\\]", "\\([^)]*\\)"] {
-            if let regex = try? NSRegularExpression(pattern: pattern) {
-                t = regex.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "")
-            }
-        }
-        // 折叠"复读机"式重复：同一短语连续出现 3 次以上时只保留一次
-        if let regex = try? NSRegularExpression(pattern: "(.{2,24}?)\\1{2,}", options: [.dotMatchesLineSeparators]) {
-            t = regex.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "$1")
-        }
-        // 整大段内容被原样复述一遍（whisper 长句幻觉）也只保留一次
-        if let regex = try? NSRegularExpression(pattern: "(.{12,400}?)\\1+", options: [.dotMatchesLineSeparators]) {
-            t = regex.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "$1")
-        }
-        return t.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// 释放模型内存
@@ -213,4 +193,10 @@ final class WhisperService {
     var isModelLoaded: Bool {
         ctx != nil
     }
+}
+
+// MARK: - SpeechEngine 协议
+
+extension WhisperService: SpeechEngine {
+    var engineName: String { "Whisper" }
 }

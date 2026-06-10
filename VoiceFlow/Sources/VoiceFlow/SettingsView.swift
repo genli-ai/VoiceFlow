@@ -139,7 +139,10 @@ private struct RecognitionTab: View {
     @AppStorage(SettingsKeys.fastDecode) private var fastDecode = false
     @AppStorage(SettingsKeys.modelFileName) private var modelFileName = WhisperModels.defaultFileName
     @AppStorage(SettingsKeys.customVocabulary) private var vocabulary = ""
+    @AppStorage(SettingsKeys.engine) private var engine = EngineChoice.auto.rawValue
+    @AppStorage(SettingsKeys.qwenModelRepo) private var qwenRepo = QwenModels.defaultRepo
     @ObservedObject private var downloader = ModelDownloader.shared
+    @ObservedObject private var qwenDownloader = QwenModelDownloader.shared
     @State private var refreshTick = 0
 
     private var modelExists: Bool {
@@ -147,10 +150,53 @@ private struct RecognitionTab: View {
         return FileManager.default.fileExists(atPath: Paths.modelsDir.appendingPathComponent(modelFileName).path)
     }
 
+    private var qwenModelExists: Bool {
+        _ = refreshTick
+        let dir = QwenModels.localDirectory(for: qwenRepo)
+        return FileManager.default.fileExists(atPath: dir.appendingPathComponent("model.safetensors").path)
+    }
+
     var body: some View {
         Form {
             Section {
-                Picker("识别语言：", selection: $language) {
+                Picker("识别引擎：", selection: $engine) {
+                    ForEach(EngineChoice.allCases, id: \.rawValue) { choice in
+                        Text(choice.displayName).tag(choice.rawValue)
+                    }
+                }
+                Picker("Qwen 模型：", selection: $qwenRepo) {
+                    ForEach(QwenModels.all, id: \.repo) { m in
+                        Text("\(m.title) · \(m.sizeNote)").tag(m.repo)
+                    }
+                }
+                HStack {
+                    Image(systemName: qwenModelExists ? "checkmark.circle.fill" : "arrow.down.circle")
+                        .foregroundColor(qwenModelExists ? .green : .orange)
+                    Text(qwenModelExists ? "Qwen 模型已就绪" : "Qwen 模型未下载")
+                    Spacer()
+                    if qwenDownloader.isDownloading {
+                        Button("取消") { qwenDownloader.cancel() }
+                    } else {
+                        Button(qwenModelExists ? "重新下载" : "下载 Qwen 模型") {
+                            qwenDownloader.download(repo: qwenRepo)
+                        }
+                    }
+                }
+                if qwenDownloader.isDownloading {
+                    ProgressView(value: qwenDownloader.progress)
+                }
+                if !qwenDownloader.statusText.isEmpty {
+                    Text(qwenDownloader.statusText)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Text("Qwen3-ASR：2026 新一代引擎，中文与中英混说显著更准，且专有词汇表会作为热词直接送入模型（whisper 不具备）。仅支持 Apple Silicon。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
+                Picker("识别语言（whisper 引擎用）：", selection: $language) {
                     Text("自动检测（多语言推荐）").tag("auto")
                     Text("中文（可夹杂英文）").tag("zh")
                     Text("英文").tag("en")
@@ -220,6 +266,9 @@ private struct RecognitionTab: View {
         .formStyle(.grouped)
         .padding(.top, 4)
         .onReceive(downloader.$isDownloading) { _ in
+            refreshTick += 1
+        }
+        .onReceive(qwenDownloader.$isDownloading) { _ in
             refreshTick += 1
         }
     }

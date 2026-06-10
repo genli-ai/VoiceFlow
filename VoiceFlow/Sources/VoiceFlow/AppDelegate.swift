@@ -31,9 +31,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !Permissions.isAccessibilityTrusted {
             Permissions.promptAccessibility()
         }
-        if WhisperService.shared.isModelAvailable {
+        if EngineRouter.current.isModelAvailable {
             // 后台预加载模型，第一次听写不用等
-            WhisperService.shared.preload()
+            EngineRouter.current.preload()
         } else {
             SettingsWindowController.shared.show()
         }
@@ -128,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        if WhisperService.shared.isModelLoaded {
+        if WhisperService.shared.isModelLoaded || QwenEngine.shared.isModelLoaded {
             menu.addItem(makeItem("释放模型内存", #selector(unloadModel)))
         }
 
@@ -180,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func unloadModel() {
         WhisperService.shared.unloadModel()
+        QwenEngine.shared.unloadModel()
     }
 
     @objc private func openSettings() {
