@@ -1,0 +1,6 @@
+.build/
+dist/
+Frameworks/whisper.xcframework/
+Frameworks/*.zip
+build.log
+.DS_Store
