@@ -45,5 +45,5 @@ cp out/tokenizer.json "$OUT_DIR/tokenizer.json"
 ls -lh "$OUT_DIR/tokenizer.json"
 
 echo
-echo "✅ 完成！现在重新运行「Install VoiceFlow V2.command」，App 会自动把它补进模型目录。"
+echo "✅ $(t "完成！现在重新运行安装脚本，App 会自动把它补进模型目录。" "Done! Re-run the installer — the app will copy it into the model directory automatically.")"
 echo "$(t "按任意键关闭…" "Press any key to close…")"; read -n 1 -s || true
