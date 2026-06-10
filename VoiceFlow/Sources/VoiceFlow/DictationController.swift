@@ -50,9 +50,8 @@ final class DictationController {
         "com.tencent.xinWeChat", "com.tencent.qq",
     ]
 
+    /// 智能档位（简化版）：代码工具里自动切为仅识别，避免润色干扰技术内容
     private static func smartLevel(for bundleID: String, fallback: PolishLevel) -> PolishLevel {
-        if chatApps.contains(bundleID) { return .light }
-        if writingApps.contains(bundleID) { return .deep }
         if codeApps.contains(bundleID) { return .off }
         return fallback
     }
@@ -208,7 +207,7 @@ final class DictationController {
                     level = Self.smartLevel(for: self.targetBundleID, fallback: level)
                 }
                 if level != .off, KeychainHelper.loadAPIKey() != nil {
-                    var label = level == .deep ? "深度润色中…" : "润色中…"
+                    var label = "润色中…"
                     if Settings.shared.smartLevelEnabled, !self.targetAppName.isEmpty {
                         label += "（\(self.targetAppName)）"
                     }

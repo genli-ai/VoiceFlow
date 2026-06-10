@@ -140,10 +140,16 @@ enum AgentService {
         if scene != .unknown {
             system += "\n当前粘贴目标场景：\(scene.styleHint)"
         }
+        // 程序级硬约束：检测到邮件类任务，强制注入格式模板（prompt 规则单独使用时遵守不稳定）
+        var userContent = instruction
+        let lower = instruction.lowercased()
+        if lower.contains("邮件") || lower.contains("email") || lower.contains("mail") {
+            userContent += "\n\n[格式硬性要求：按完整邮件格式输出——第一行称呼；空一行；正文分段；空一行；结尾敬语；最后一行署名（用户没提供姓名就写【你的名字】）。不输出主题行，除非用户明确要求。]"
+        }
         LLMClient.chat(messages: [
             ["role": "system", "content": system],
-            ["role": "user", "content": instruction],
-        ], temperature: 0.4, timeout: 40, completion: completion)
+            ["role": "user", "content": userContent],
+        ], temperature: 0.25, timeout: 40, completion: completion)
     }
 
     /// 技能：根据选中的对方消息草拟回复
@@ -167,10 +173,13 @@ enum AgentService {
             break
         }
         let req = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
-        let user = "对方消息/上下文：\n\(context)\n\n用户要求：\(req.isEmpty ? "得体地回复" : req)"
+        var user = "对方消息/上下文：\n\(context)\n\n用户要求：\(req.isEmpty ? "得体地回复" : req)"
+        if scene == .email {
+            user += "\n\n[格式硬性要求：按完整邮件格式输出——称呼一行、空行、分段正文、空行、结尾敬语、署名行（没有姓名就写【你的名字】）。]"
+        }
         LLMClient.chat(messages: [
             ["role": "system", "content": system],
             ["role": "user", "content": user],
-        ], temperature: 0.4, timeout: 25, completion: completion)
+        ], temperature: 0.3, timeout: 25, completion: completion)
     }
 }

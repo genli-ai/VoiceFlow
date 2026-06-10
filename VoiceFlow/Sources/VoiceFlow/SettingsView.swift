@@ -254,11 +254,11 @@ private struct PolishTab: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
-                Text("「仅识别」完全不联网；「标准润色」忠实于原话；「深度润色」会像 Typeless 那样重组逻辑、合并车轱辘话、必要时分段列点。菜单栏图标里可以快速切换。")
+                Text("「仅识别」完全不联网；「AI 润色」自适应处理力度——短句只做轻清理（去语气词、修错字），长段混乱口述自动重构成可直接使用的成品文字，并按目标应用（聊天/邮件/文档）适配风格。菜单栏图标里可以快速切换。")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Toggle("智能档位：按当前应用自动选择", isOn: $smartLevel)
-                Text("聊天应用（微信/QQ/Slack/钉钉/飞书等）→ 标准润色；邮件/文档（Mail/Word/Notes/Notion 等）→ 深度润色；代码编辑器/终端 → 仅识别；其余应用 → 上面手动选的档位。注意：手动选「仅识别」时智能档位不生效，保证完全不联网。")
+                Toggle("代码工具自动仅识别", isOn: $smartLevel)
+                Text("在代码编辑器和终端（VS Code/Xcode/Terminal 等）里自动切为仅识别，避免润色干扰技术内容。")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

@@ -57,15 +57,13 @@ enum TriggerMode: String, CaseIterable {
 // MARK: - 润色档位
 
 enum PolishLevel: String, CaseIterable {
-    case off    // 仅本地识别
-    case light  // 标准润色
-    case deep   // 深度润色（重组逻辑）
+    case off     // 仅本地识别
+    case smart   // 自适应润色：短句轻清理，长段混乱口述自动重构
 
     var displayName: String {
         switch self {
-        case .off: return "仅识别（最快，不联网）"
-        case .light: return "标准润色（去口头禅、修错别字）"
-        case .deep: return "深度润色（重组逻辑、整理表达）"
+        case .off: return "仅识别（最快，完全不联网）"
+        case .smart: return "AI 润色（自适应：短句轻清理，长口述自动重构）"
         }
     }
 }
@@ -134,7 +132,7 @@ final class Settings {
             SettingsKeys.hotkey: HotkeyChoice.rightOption.rawValue,
             SettingsKeys.triggerMode: TriggerMode.toggle.rawValue,
             SettingsKeys.polishEnabled: true,
-            SettingsKeys.polishLevel: PolishLevel.light.rawValue,
+            SettingsKeys.polishLevel: PolishLevel.smart.rawValue,
             SettingsKeys.openaiBaseURL: "https://api.openai.com/v1",
             SettingsKeys.chatModel: "gpt-5.4-mini",
             SettingsKeys.customPolishRules: "",
@@ -175,7 +173,8 @@ final class Settings {
     }
 
     var polishLevel: PolishLevel {
-        get { PolishLevel(rawValue: d.string(forKey: SettingsKeys.polishLevel) ?? "") ?? .light }
+        // 旧值 light/deep 自动迁移为 smart
+        get { PolishLevel(rawValue: d.string(forKey: SettingsKeys.polishLevel) ?? "") ?? .smart }
         set { d.set(newValue.rawValue, forKey: SettingsKeys.polishLevel) }
     }
 
