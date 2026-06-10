@@ -326,9 +326,9 @@ private struct PolishTab: View {
                 if provider == LLMProvider.deepseek.rawValue {
                     TextField("Base URL", text: $dsBaseURL)
                         .textFieldStyle(.roundedBorder)
-                    TextField("模型名（如 deepseek-chat）", text: $dsModel)
+                    TextField("模型名（如 deepseek-v4-flash）", text: $dsModel)
                         .textFieldStyle(.roundedBorder)
-                    Text("可选模型：deepseek-chat（推荐，通用对话模型，润色快且便宜）、deepseek-reasoner（推理模型，慢且贵，不适合润色场景）。Key 在 platform.deepseek.com 申请。")
+                    Text("可选模型：deepseek-v4-flash（推荐，快且便宜）、deepseek-v4-pro（更强但更贵）。若响应偏慢，可改填 deepseek-chat（= flash 的非思考模式别名）。Key 在 platform.deepseek.com 申请。")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {

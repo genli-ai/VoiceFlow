@@ -97,7 +97,7 @@ enum LLMProvider: String, CaseIterable {
     var defaultModel: String {
         switch self {
         case .openai: return "gpt-5.4-mini"
-        case .deepseek: return "deepseek-chat"
+        case .deepseek: return "deepseek-v4-flash"
         }
     }
 }
