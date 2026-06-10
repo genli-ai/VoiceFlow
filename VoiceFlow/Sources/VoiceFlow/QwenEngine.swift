@@ -69,8 +69,25 @@ final class QwenEngine: SpeechEngine {
         return task
     }
 
+    /// HF 上的 Qwen3-ASR 量化仓库普遍缺 tokenizer.json（swift-transformers 必需），
+    /// 从 App 自带资源里补一份到模型目录
+    private func ensureTokenizerFile() -> VFError? {
+        let dest = modelDirectory.appendingPathComponent("tokenizer.json")
+        if FileManager.default.fileExists(atPath: dest.path) { return nil }
+        guard let bundled = Bundle.main.url(forResource: "tokenizer", withExtension: "json",
+                                            subdirectory: "QwenTokenizer") else {
+            return VFError("缺少分词器资源。请先运行 scripts/Generate Qwen Tokenizer.command 再重新安装")
+        }
+        do {
+            try FileManager.default.copyItem(at: bundled, to: dest)
+            return nil
+        } catch {
+            return VFError("无法写入 tokenizer.json：\(error.localizedDescription)")
+        }
+    }
+
     func preload() {
-        guard isModelAvailable else { return }
+        guard isModelAvailable, ensureTokenizerFile() == nil else { return }
         _ = ensureLoadTask()
     }
 
@@ -85,6 +102,10 @@ final class QwenEngine: SpeechEngine {
             DispatchQueue.main.async {
                 completion(.failure(VFError("Qwen 模型未下载，请在 设置 → 识别 中下载")))
             }
+            return
+        }
+        if let tokErr = ensureTokenizerFile() {
+            DispatchQueue.main.async { completion(.failure(tokErr)) }
             return
         }
 

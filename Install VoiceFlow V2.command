@@ -127,6 +127,16 @@ if compgen -G "$PRODUCTS/*.bundle" > /dev/null; then
     green "  ✓ 已嵌入 $(ls -d "$PRODUCTS"/*.bundle | wc -l | tr -d ' ') 个资源包"
 fi
 
+# Qwen 分词器资源（模型仓库不带 tokenizer.json，App 运行时自动补进模型目录）
+if [ -f "Resources/QwenTokenizer/tokenizer.json" ]; then
+    mkdir -p "$APP/Contents/Resources/QwenTokenizer"
+    cp "Resources/QwenTokenizer/tokenizer.json" "$APP/Contents/Resources/QwenTokenizer/"
+    green "  ✓ 已嵌入 Qwen 分词器"
+else
+    red "  ⚠ 缺少 Resources/QwenTokenizer/tokenizer.json——Qwen 引擎将不可用。"
+    red "    请先双击 scripts/Generate Qwen Tokenizer.command 生成后重新安装。"
+fi
+
 # 图标
 if [ -f "Resources/AppIcon.png" ]; then
     ICONSET=$(mktemp -d)/AppIcon.iconset
@@ -153,19 +163,14 @@ codesign --force -s - "$APP" || fail "签名失败"
 codesign --verify --deep "$APP" || fail "签名校验未通过"
 green "  ✓ VoiceFlow.app (V2) 打包完成"
 
-# ── 5. whisper 模型（备用引擎用，已有则跳过） ─────────
-step "5/6 检查 whisper 备用模型"
+# ── 5. whisper 备用模型（V2 不再默认下载） ───────────
+step "5/6 whisper 备用模型"
 MODELS_DIR="$HOME/Library/Application Support/VoiceFlow/models"
-mkdir -p "$MODELS_DIR"
 MODEL="ggml-large-v3-turbo-q5_0.bin"
 if [ -f "$MODELS_DIR/$MODEL" ]; then
-    green "  ✓ whisper 模型已存在"
+    green "  ✓ whisper 备用模型已存在"
 else
-    echo "  （可选）下载 whisper 备用模型，Qwen 模型装好后可不用它"
-    download "$MODELS_DIR/$MODEL" \
-        "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/$MODEL" \
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$MODEL" \
-        || red "  whisper 模型下载失败——不影响 V2，可稍后在设置里补"
+    echo "  跳过（V2 以 Qwen 为主引擎；如需 whisper 备用，在 App 设置 → 识别 里下载）"
 fi
 
 # ── 6. 安装 ─────────────────────────────────────────

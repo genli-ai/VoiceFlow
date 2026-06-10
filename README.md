@@ -14,7 +14,19 @@ GPT 润色（去掉"嗯、呃、那个"，加标点，修错别字）
 文字自动输入到当前光标处
 ```
 
-## 安装（一次搞定）
+## V2（本分支）：Qwen3-ASR 双引擎
+
+V2 把默认识别引擎升级为 **Qwen3-ASR**（阿里 2026 开源，约 30 种语言 + 22 种中文方言，中文与中英混说显著强于 whisper，且专有词汇表会作为**热词直接送入模型**）。whisper 保留为备用引擎，设置里随时切换。
+
+V2 要求：**Apple Silicon + macOS 15+ + 完整 Xcode**（MLX 的 Metal 着色器需要 Xcode 编译；Intel/老系统请用 main 分支的 V1）。
+
+V2 安装三步：
+
+1. 双击 `scripts/Generate Qwen Tokenizer.command`（一次性，生成模型缺失的分词器文件）
+2. 双击 `Install VoiceFlow V2.command`（首次编译 5-15 分钟，会自动下载 Metal 工具链）
+3. 打开 App → 设置 → 识别 → 下载 Qwen 模型（约 850MB，国内镜像加速）
+
+## V1 安装（一次搞定）
 
 双击 **`Install VoiceFlow.command`**，等它跑完即可。脚本会自动：
 
