@@ -43,6 +43,10 @@ final class DictationController {
         "com.microsoft.VSCode", "com.apple.dt.Xcode", "com.apple.Terminal",
         "com.googlecode.iterm2", "com.todesktop.230313mzl4w4u92", "dev.zed.Zed",
     ]
+    /// 无障碍接口残缺、读选区需要 ⌘C 兜底的应用
+    private static let poorAXApps: Set<String> = [
+        "com.tencent.xinWeChat", "com.tencent.qq",
+    ]
 
     private static func smartLevel(for bundleID: String, fallback: PolishLevel) -> PolishLevel {
         if chatApps.contains(bundleID) { return .light }
@@ -120,6 +124,14 @@ final class DictationController {
             self.targetAppName = frontmost?.localizedName ?? ""
             // V3：录此刻的选区快照，供语音技能（修改选中/帮我回复）使用
             self.targetSelection = Settings.shared.skillsEnabled ? SelectionReader.readSelectedText() : nil
+            // 微信/QQ 的无障碍接口残缺，AX 读不到时用 ⌘C 兜底（异步，不阻塞录音；用完即恢复剪贴板）
+            if self.targetSelection == nil, Settings.shared.skillsEnabled,
+               Self.poorAXApps.contains(self.targetBundleID) {
+                SelectionReader.readSelectedTextWithClipboardFallback { [weak self] text in
+                    guard let self = self, self.phase == .recording else { return }
+                    self.targetSelection = text
+                }
+            }
             self.recorder.onLevel = { [weak self] level in
                 DispatchQueue.main.async {
                     self?.overlay.state.pushLevel(level)
@@ -244,12 +256,25 @@ final class DictationController {
     /// 技能：帮我回复——基于选中的对方消息草拟回复。
     /// 安全策略：不自动粘贴（焦点通常在消息区而非输入框），复制到剪贴板由用户 ⌘V。
     private func runReplyDraft(instruction: String, raw: String) {
-        guard let context = targetSelection else {
-            phase = .idle
-            overlay.flashError("读不到上下文：先选中要回复的消息，再说「帮我回复」")
-            Sounds.playError()
+        if let context = targetSelection {
+            executeReplyDraft(context: context, instruction: instruction, raw: raw)
             return
         }
+        // AX 没读到：此刻焦点仍在目标应用、选区还在，用 ⌘C 兜底再试一次
+        overlay.showProcessing("读取选中内容…")
+        SelectionReader.readSelectedTextWithClipboardFallback { [weak self] context in
+            guard let self = self else { return }
+            guard let context = context else {
+                self.phase = .idle
+                self.overlay.flashError("读不到选中内容：请重新选中要回复的消息再试")
+                Sounds.playError()
+                return
+            }
+            self.executeReplyDraft(context: context, instruction: instruction, raw: raw)
+        }
+    }
+
+    private func executeReplyDraft(context: String, instruction: String, raw: String) {
         overlay.showProcessing("草拟回复中…")
         let scene = SceneClassifier.scene(for: targetBundleID)
         AgentService.replyDraft(context: context, instruction: instruction, scene: scene) { [weak self] result, failure in
