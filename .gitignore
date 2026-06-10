@@ -8,3 +8,4 @@ VoiceFlow/.xcbuild/
 VoiceFlow-v*.zip
 VoiceFlow-v*.dmg
 release/
+scripts/maintainer/
