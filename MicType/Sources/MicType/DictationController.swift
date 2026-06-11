@@ -43,10 +43,10 @@ final class DictationController {
         }
     }
 
-    /// 指令模式：按住快捷键触发（技能关闭时降级为普通输入）
+    /// 指令模式：按住快捷键触发
     func skillHoldStart() {
         guard phase == .idle else { return }
-        startRecording(skill: Settings.shared.skillsEnabled)
+        startRecording(skill: true)
     }
 
     func skillHoldEnd() {

@@ -254,7 +254,6 @@ private struct RecognitionTab: View {
 private struct PolishTab: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage(SettingsKeys.polishLevel) private var polishLevel = PolishLevel.smart.rawValue
-    @AppStorage(SettingsKeys.skillsEnabled) private var skillsEnabled = true
     @AppStorage(SettingsKeys.llmProvider) private var provider = LLMProvider.openai.rawValue
     @AppStorage(SettingsKeys.openaiBaseURL) private var baseURL = "https://api.openai.com/v1"
     @AppStorage(SettingsKeys.chatModel) private var chatModel = "gpt-5.4-nano"
@@ -290,9 +289,8 @@ private struct PolishTab: View {
             }
 
             Section {
-                Toggle(tr("语音技能", "Voice commands"), isOn: $skillsEnabled)
-                Text(tr("轻点快捷键 = 纯语音输入，说什么打什么；按住快捷键说话、松手执行 = 指令模式。选中文字后按住开口，AI 自动判断意图：要求加工这段文字（改写/翻译）→ 直接替换选区；要求回复对方（「回复他…」「跟他说…」）→ 草稿进剪贴板按 ⌘V；要求写新东西 → 结果输出到光标处。什么都没选就是自由指令（草拟邮件、翻译、提问）。",
-                        "Tap = pure dictation, whatever you say gets typed. Hold = command mode. With text selected, speak naturally and AI infers the intent: transform the text (rewrite/translate) → selection replaced; reply to the sender (\"reply to him…\", \"tell them…\") → draft lands on the clipboard, press ⌘V; compose something new → result typed at your cursor. With nothing selected it's a free-form command (draft an email, translate, ask anything)."))
+                Text(tr("语音指令（按住快捷键）：选中文字后按住开口，AI 自动判断意图——要求加工这段文字（改写/翻译）→ 直接替换选区；要求回复对方（「回复他…」「跟他说…」）→ 草稿进剪贴板按 ⌘V；要求写新东西 → 结果输出到光标处。什么都没选就是自由指令（草拟邮件、翻译、提问）。",
+                        "Voice commands (hold the hotkey): with text selected, speak naturally and AI infers the intent — transform the text (rewrite/translate) → selection replaced; reply to the sender (\"reply to him…\", \"tell them…\") → draft lands on the clipboard, press ⌘V; compose something new → result typed at your cursor. With nothing selected it's a free-form command (draft an email, translate, ask anything)."))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -469,8 +467,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.2.3 · Qwen3-ASR 引擎 + 语音技能",
-                    "Version 3.2.3 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.2.4 · Qwen3-ASR 引擎 + 语音指令",
+                    "Version 3.2.4 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))

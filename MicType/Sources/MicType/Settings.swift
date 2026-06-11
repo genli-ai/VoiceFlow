@@ -108,7 +108,6 @@ enum SettingsKeys {
     static let appLanguage = "appLanguage"
     static let deepseekBaseURL = "deepseekBaseURL"
     static let deepseekModel = "deepseekModel"
-    static let skillsEnabled = "skillsEnabled"
 }
 
 // MARK: - 设置
@@ -132,7 +131,6 @@ final class Settings {
             SettingsKeys.playSounds: true,
             SettingsKeys.restoreClipboard: true,
             SettingsKeys.qwenModelRepo: QwenModels.defaultRepo,
-            SettingsKeys.skillsEnabled: true,
             SettingsKeys.llmProvider: LLMProvider.openai.rawValue,
             SettingsKeys.deepseekBaseURL: LLMProvider.deepseek.defaultBaseURL,
             SettingsKeys.deepseekModel: LLMProvider.deepseek.defaultModel,
@@ -278,12 +276,6 @@ final class Settings {
         case .openai: return openaiCommandModel
         case .deepseek: return deepseekCommandModel
         }
-    }
-
-    /// V3 语音技能（修改选中文本 / 帮我回复）
-    var skillsEnabled: Bool {
-        get { d.bool(forKey: SettingsKeys.skillsEnabled) }
-        set { d.set(newValue, forKey: SettingsKeys.skillsEnabled) }
     }
 
     /// Qwen 模型 HF 仓库 ID
