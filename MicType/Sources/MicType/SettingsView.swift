@@ -270,6 +270,10 @@ private struct PolishTab: View {
     @State private var testResult = ""
     @State private var testing = false
 
+    // 快选预设（输入框仍可手填任意模型名）
+    private static let openaiPresets = ["gpt-5.4-nano", "gpt-5.4-mini", "gpt-5.4", "gpt-5.5"]
+    private static let deepseekPresets = ["deepseek-v4-flash", "deepseek-chat", "deepseek-v4-pro"]
+
     var body: some View {
         Form {
             Section {
@@ -351,23 +355,23 @@ private struct PolishTab: View {
                 if provider == LLMProvider.deepseek.rawValue {
                     TextField(tr("Base URL", "Base URL"), text: $dsBaseURL)
                         .textFieldStyle(.roundedBorder)
-                    TextField(tr("润色模型（求快，如 deepseek-v4-flash）", "Polish model (fast, e.g. deepseek-v4-flash)"), text: $dsModel)
-                        .textFieldStyle(.roundedBorder)
-                    TextField(tr("指令模型（求好，如 deepseek-v4-pro）", "Command model (strong, e.g. deepseek-v4-pro)"), text: $dsCommandModel)
-                        .textFieldStyle(.roundedBorder)
-                    Text(tr("润色高频求快、指令低频求好，两个模型分开配。flash 快且便宜，pro 更强；响应慢可改 deepseek-chat（flash 非思考别名）。Key 在 platform.deepseek.com 申请。",
-                            "Polish runs often and wants speed; commands run rarely and want quality — configure them separately. flash is fast & cheap, pro is stronger; use deepseek-chat if responses feel slow. Get a key at platform.deepseek.com."))
+                    ModelField(label: tr("润色模型（求快）", "Polish model (fast)"),
+                               text: $dsModel, presets: Self.deepseekPresets)
+                    ModelField(label: tr("指令模型（求好）", "Command model (strong)"),
+                               text: $dsCommandModel, presets: Self.deepseekPresets)
+                    Text(tr("润色高频求快、指令低频求好，两个模型分开配。右侧下拉快选：flash 快且便宜，pro 更强，deepseek-chat 是 flash 非思考别名（响应慢时用）。也可手填任意模型名。Key 在 platform.deepseek.com 申请。",
+                            "Polish runs often and wants speed; commands run rarely and want quality. Quick-pick on the right: flash is fast & cheap, pro is stronger, deepseek-chat is flash without thinking mode. Or type any model name. Get a key at platform.deepseek.com."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
                     TextField(tr("Base URL", "Base URL"), text: $baseURL)
                         .textFieldStyle(.roundedBorder)
-                    TextField(tr("润色模型（求快，如 gpt-5.4-nano）", "Polish model (fast, e.g. gpt-5.4-nano)"), text: $chatModel)
-                        .textFieldStyle(.roundedBorder)
-                    TextField(tr("指令模型（求好，如 gpt-5.4-mini / gpt-5.5）", "Command model (strong, e.g. gpt-5.4-mini / gpt-5.5)"), text: $openaiCommandModel)
-                        .textFieldStyle(.roundedBorder)
-                    Text(tr("润色高频求快（默认 nano），指令低频求好（默认 mini，想要 ChatGPT 旗舰级就填 gpt-5.5）。也可填任何 OpenAI 兼容服务（如高速推理商）。",
-                            "Polish runs often and wants speed (default nano); commands run rarely and want quality (default mini — use gpt-5.5 for flagship-level writing). Any OpenAI-compatible endpoint works, including fast-inference providers."))
+                    ModelField(label: tr("润色模型（求快）", "Polish model (fast)"),
+                               text: $chatModel, presets: Self.openaiPresets)
+                    ModelField(label: tr("指令模型（求好）", "Command model (strong)"),
+                               text: $openaiCommandModel, presets: Self.openaiPresets)
+                    Text(tr("润色高频求快（默认 nano），指令低频求好（默认 mini）。右侧下拉可快选 OpenAI 当前在售型号——gpt-5.4 标准版质量高于 mini 价格半于 5.5，gpt-5.5 旗舰最强。也可手填任何 OpenAI 兼容服务的模型名。",
+                            "Polish runs often and wants speed (default nano); commands run rarely and want quality (default mini). Quick-pick current OpenAI models on the right — gpt-5.4 beats mini at half the price of 5.5; gpt-5.5 is the flagship. Or type any OpenAI-compatible model name."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -415,6 +419,29 @@ private struct PolishTab: View {
     }
 }
 
+/// 模型名输入框 + 预设快选下拉（仍可手填任意兼容模型名）
+private struct ModelField: View {
+    let label: String
+    @Binding var text: String
+    let presets: [String]
+
+    var body: some View {
+        HStack(spacing: 6) {
+            TextField(label, text: $text)
+                .textFieldStyle(.roundedBorder)
+            Menu {
+                ForEach(presets, id: \.self) { name in
+                    Button(name) { text = name }
+                }
+            } label: {
+                Image(systemName: "chevron.up.chevron.down")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+    }
+}
+
 /// Key 保存状态小徽章
 private struct KeyStatusBadge: View {
     let name: String
@@ -442,8 +469,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.2.2 · Qwen3-ASR 引擎 + 语音技能",
-                    "Version 3.2.2 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.2.3 · Qwen3-ASR 引擎 + 语音技能",
+                    "Version 3.2.3 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))
