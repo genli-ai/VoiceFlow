@@ -213,12 +213,28 @@ final class Settings {
         set { d.set(newValue, forKey: SettingsKeys.customVocabulary) }
     }
 
-    var vocabularyTerms: [String] {
-        customVocabulary
-            .components(separatedBy: CharacterSet(charactersIn: ",，、\n"))
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+    /// 词汇表解析：普通词条做热词/润色提示；"错写=正写"词条做硬替换（正写同时进热词）
+    var vocabularyEntries: (terms: [String], replacements: [(wrong: String, right: String)]) {
+        var terms: [String] = []
+        var replacements: [(String, String)] = []
+        let raw = customVocabulary.replacingOccurrences(of: "＝", with: "=")
+        for item in raw.components(separatedBy: CharacterSet(charactersIn: ",，、\n")) {
+            let entry = item.trimmingCharacters(in: .whitespaces)
+            guard !entry.isEmpty else { continue }
+            let parts = entry.split(separator: "=", maxSplits: 1)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
+                replacements.append((parts[0], parts[1]))
+                terms.append(parts[1])
+            } else {
+                terms.append(entry)
+            }
+        }
+        return (terms, replacements)
     }
+
+    var vocabularyTerms: [String] { vocabularyEntries.terms }
+    var vocabularyReplacements: [(wrong: String, right: String)] { vocabularyEntries.replacements }
 
     var playSounds: Bool {
         get { d.bool(forKey: SettingsKeys.playSounds) }

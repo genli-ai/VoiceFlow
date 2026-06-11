@@ -55,6 +55,16 @@ enum TextPostProcessor {
         return t.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// 词汇表硬替换（"错写=正写"词条）：确定性字符串替换，零耗时、不依赖模型。
+    /// 完全同音的专有名词（如 杰文→捷文）概率方法救不了，这是最后一道硬保证。
+    static func applyVocabReplacements(_ text: String) -> String {
+        var t = text
+        for (wrong, right) in Settings.shared.vocabularyReplacements {
+            t = t.replacingOccurrences(of: wrong, with: right)
+        }
+        return t
+    }
+
     /// 中英混合标点修正：英文内容后面的全角标点改为半角（像豆包那样）
     /// 例：「to test。」→「to test.」  「iPhone，然后」→「iPhone, 然后」
     static func fixMixedPunctuation(_ text: String) -> String {

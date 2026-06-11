@@ -10,3 +10,6 @@ MicType-v*.dmg
 release/
 scripts/maintainer/
 .vscode/
+MicTypeWindows/src/**/bin/
+MicTypeWindows/src/**/obj/
+MicTypeWindows/artifacts/

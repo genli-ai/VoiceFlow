@@ -1,0 +1,200 @@
+using System.Windows;
+using System.Windows.Controls;
+using MicType.Win.Core;
+using MicType.Win.Services;
+
+namespace MicType.Win.Views;
+
+public partial class SettingsWindow : Window
+{
+    private AppSettings Settings => SettingsStore.Instance.Current;
+
+    public SettingsWindow()
+    {
+        InitializeComponent();
+        LoadSettingsIntoUi();
+        LoadLabels();
+        L10n.LanguageChanged += LoadLabels;
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        L10n.LanguageChanged -= LoadLabels;
+        base.OnClosed(e);
+    }
+
+    private void LoadSettingsIntoUi()
+    {
+        SelectByTag(LanguageBox, Settings.AppLanguage.ToString());
+        SelectByTag(HotkeyBox, Settings.Hotkey.ToString());
+        PlaySoundsBox.IsChecked = Settings.PlaySounds;
+        RestoreClipboardBox.IsChecked = Settings.RestoreClipboard;
+        VocabularyBox.Text = Settings.CustomVocabulary;
+        SelectByTag(PolishLevelBox, Settings.PolishLevel.ToString());
+        SelectByTag(ProviderBox, Settings.LlmProvider.ToString());
+        PolishTempSlider.Value = Settings.PolishTemperature;
+        CommandTempSlider.Value = Settings.CommandTemperature;
+        AboutMeBox.Text = Settings.AboutMe;
+        RulesBox.Text = Settings.CustomPolishRules;
+        LoadProviderFields();
+    }
+
+    private void LoadLabels()
+    {
+        Title = L10n.Tr("MicType 设置", "MicType Settings");
+        GeneralTab.Header = L10n.Tr("通用", "General");
+        RecognitionTab.Header = L10n.Tr("识别", "Recognition");
+        AiTab.Header = L10n.Tr("AI 润色", "AI Polish");
+        AboutTab.Header = L10n.Tr("关于", "About");
+        LanguageLabel.Text = L10n.Tr("界面语言 / Language", "Language / 界面语言");
+        HotkeyLabel.Text = L10n.Tr("听写快捷键", "Dictation hotkey");
+        PlaySoundsBox.Content = L10n.Tr("开始 / 完成时播放提示音", "Play sounds on start / finish");
+        RestoreClipboardBox.Content = L10n.Tr("输入后恢复原剪贴板内容", "Restore clipboard after inserting");
+        GestureHelp.Text = L10n.Tr(
+            "轻点：开始 / 结束听写 · 按住说话、松手：执行语音指令 · 录音中按 Esc 取消。",
+            "Tap: start / stop dictation · Hold to speak a command, release to run · Esc cancels.");
+        AsrStatusLabel.Text = L10n.Tr("本地识别引擎", "Local speech engine");
+        AsrStatusText.Text = L10n.Tr(
+            "当前是 Windows 工程骨架：ASR 接口已就绪，但 sherpa-onnx / whisper.cpp 需要 M0 在 Windows 11 真机跑分后接入。",
+            "This is the Windows engineering scaffold: the ASR interface is ready, but sherpa-onnx / whisper.cpp must be selected after M0 on a real Windows 11 machine.");
+        VocabularyLabel.Text = L10n.Tr("专有词汇表（逗号或换行分隔）", "Custom vocabulary (comma or newline separated)");
+        VocabularyHelp.Text = L10n.Tr(
+            "这些词会作为热词/提示参与本地识别与 AI 润色。接入具体 ASR 引擎时必须保留静音门和热词复读防护。",
+            "These terms feed local ASR and AI polish. The silence gate and hotword-echo guard must stay enabled when a concrete ASR engine is wired.");
+        PolishModeLabel.Text = L10n.Tr("润色档位", "Polish mode");
+        ProviderLabel.Text = L10n.Tr("当前使用", "Active provider");
+        PolishModelLabel.Text = L10n.Tr("润色模型（求快）", "Polish model (fast)");
+        CommandModelLabel.Text = L10n.Tr("指令模型（求好）", "Command model (strong)");
+        SaveKeyButton.Content = L10n.Tr("保存 Key", "Save Key");
+        TestPolishButton.Content = L10n.Tr("测试润色模型", "Test polish");
+        TestCommandButton.Content = L10n.Tr("测试指令模型", "Test command");
+        TemperatureLabel.Text = L10n.Tr("温度", "Temperature");
+        PolishTempLabel.Text = L10n.Tr("润色温度", "Polish temp");
+        CommandTempLabel.Text = L10n.Tr("指令温度", "Command temp");
+        AboutMeLabel.Text = L10n.Tr("关于我（可选）", "About me (optional)");
+        RulesLabel.Text = L10n.Tr("自定义规则（可选）", "Custom rules (optional)");
+        AboutText.Text = L10n.Tr(
+            "Windows 版目标：右 Ctrl 轻点语音输入，长按说指令；录音和本地识别不上传；文本可按你的 GPT / DeepSeek API 润色或执行指令。\n\n当前版本是可继续开发的工程骨架，等待 M0 选定本地 ASR 引擎。",
+            "Windows goal: tap Right Ctrl to dictate, hold it to command AI. Audio and local recognition stay on device; text can be polished or executed through your GPT / DeepSeek API.\n\nThis build is a development scaffold awaiting the M0 local-ASR decision.");
+        SaveButton.Content = L10n.Tr("保存设置", "Save Settings");
+    }
+
+    private void OnLanguageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        if (LanguageBox.SelectedItem is ComboBoxItem item &&
+            Enum.TryParse<AppLanguage>((string)item.Tag, out var lang))
+        {
+            L10n.Language = lang;
+        }
+    }
+
+    private void OnProviderChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        SaveUiIntoSettings();
+        LoadProviderFields();
+        TestResultText.Text = "";
+    }
+
+    private void OnSaveSettings(object sender, RoutedEventArgs e)
+    {
+        SaveUiIntoSettings();
+        SettingsStore.Instance.Save();
+        TestResultText.Text = L10n.Tr("已保存 ✓", "Saved ✓");
+    }
+
+    private void OnSaveKey(object sender, RoutedEventArgs e)
+    {
+        SaveUiIntoSettings();
+        CredentialStore.Save(Settings.CurrentCredentialTarget, ApiKeyBox.Password);
+        TestResultText.Text = CredentialStore.Load(Settings.CurrentCredentialTarget) is null
+            ? L10n.Tr("已清空", "Cleared")
+            : L10n.Tr("已保存 Key ✓", "Key saved ✓");
+    }
+
+    private async void OnTestPolishModel(object sender, RoutedEventArgs e)
+    {
+        await TestModelAsync(PolishModelBox.Text);
+    }
+
+    private async void OnTestCommandModel(object sender, RoutedEventArgs e)
+    {
+        await TestModelAsync(CommandModelBox.Text);
+    }
+
+    private async Task TestModelAsync(string model)
+    {
+        SaveUiIntoSettings();
+        CredentialStore.Save(Settings.CurrentCredentialTarget, ApiKeyBox.Password);
+        TestResultText.Text = L10n.Tr("测试中…", "Testing…");
+        var result = await LlmClient.TestModelAsync(model);
+        TestResultText.Text = result.Message;
+    }
+
+    private void SaveUiIntoSettings()
+    {
+        if (LanguageBox.SelectedItem is ComboBoxItem langItem &&
+            Enum.TryParse<AppLanguage>((string)langItem.Tag, out var lang))
+        {
+            Settings.AppLanguage = lang;
+        }
+        if (HotkeyBox.SelectedItem is ComboBoxItem hotkeyItem &&
+            Enum.TryParse<HotkeyChoice>((string)hotkeyItem.Tag, out var hotkey))
+        {
+            Settings.Hotkey = hotkey;
+        }
+        if (PolishLevelBox.SelectedItem is ComboBoxItem polishItem &&
+            Enum.TryParse<PolishLevel>((string)polishItem.Tag, out var polish))
+        {
+            Settings.PolishLevel = polish;
+        }
+        if (ProviderBox.SelectedItem is ComboBoxItem providerItem &&
+            Enum.TryParse<LlmProvider>((string)providerItem.Tag, out var provider))
+        {
+            Settings.LlmProvider = provider;
+        }
+
+        Settings.PlaySounds = PlaySoundsBox.IsChecked == true;
+        Settings.RestoreClipboard = RestoreClipboardBox.IsChecked == true;
+        Settings.CustomVocabulary = VocabularyBox.Text;
+        Settings.PolishTemperature = PolishTempSlider.Value;
+        Settings.CommandTemperature = CommandTempSlider.Value;
+        Settings.AboutMe = AboutMeBox.Text;
+        Settings.CustomPolishRules = RulesBox.Text;
+
+        if (Settings.LlmProvider == LlmProvider.OpenAi)
+        {
+            Settings.OpenAiBaseUrl = BaseUrlBox.Text;
+            Settings.OpenAiPolishModel = PolishModelBox.Text;
+            Settings.OpenAiCommandModel = CommandModelBox.Text;
+        }
+        else
+        {
+            Settings.DeepSeekBaseUrl = BaseUrlBox.Text;
+            Settings.DeepSeekPolishModel = PolishModelBox.Text;
+            Settings.DeepSeekCommandModel = CommandModelBox.Text;
+        }
+    }
+
+    private void LoadProviderFields()
+    {
+        BaseUrlBox.Text = Settings.CurrentBaseUrl;
+        PolishModelBox.Text = Settings.CurrentPolishModel;
+        CommandModelBox.Text = Settings.CurrentCommandModel;
+        ApiKeyBox.Password = CredentialStore.Load(Settings.CurrentCredentialTarget) ?? "";
+    }
+
+    private static void SelectByTag(ComboBox comboBox, string tag)
+    {
+        foreach (var item in comboBox.Items.OfType<ComboBoxItem>())
+        {
+            if ((string)item.Tag == tag)
+            {
+                comboBox.SelectedItem = item;
+                return;
+            }
+        }
+        comboBox.SelectedIndex = 0;
+    }
+}

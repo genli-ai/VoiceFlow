@@ -170,7 +170,9 @@ final class DictationController {
                 self.phase = .idle
                 self.overlay.flashError(error.message)
                 Sounds.playError()
-            case .success(let rawText):
+            case .success(let transcribed):
+                // 词汇表"错写=正写"硬替换：进入润色/指令之前先做确定性纠正
+                let rawText = TextPostProcessor.applyVocabReplacements(transcribed)
                 guard !rawText.isEmpty else {
                     self.phase = .idle
                     self.overlay.flashError(tr("没有听到内容", "Nothing heard"))
@@ -280,7 +282,7 @@ final class DictationController {
     /// 结果进剪贴板（不自动粘贴），记录历史并提示
     private func copyToClipboard(raw: String, result: String, note: String) {
         phase = .idle
-        let final = TextPostProcessor.fixMixedPunctuation(result)
+        let final = TextPostProcessor.applyVocabReplacements(TextPostProcessor.fixMixedPunctuation(result))
         HistoryStore.shared.add(raw: raw, polished: final)
         let pb = NSPasteboard.general
         pb.clearContents()
@@ -327,7 +329,7 @@ final class DictationController {
 
     private func deliver(raw: String, final text: String, note: String, warning: Bool = false,
                          allowClipboardRestore: Bool = true) {
-        let finalText = TextPostProcessor.fixMixedPunctuation(text)
+        let finalText = TextPostProcessor.applyVocabReplacements(TextPostProcessor.fixMixedPunctuation(text))
         HistoryStore.shared.add(raw: raw, polished: finalText)
         phase = .idle
         TextInserter.insert(finalText, targetBundleID: targetBundleID,

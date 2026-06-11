@@ -224,8 +224,8 @@ private struct RecognitionTab: View {
                         .font(.system(size: 12))
                         .frame(height: 80)
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.3)))
-                    Text(tr("这些词会作为热词直接送入识别模型，并参与 AI 润色纠错——专有名词识别准确率的第一杠杆，强烈建议填写。",
-                            "These terms are fed to the speech model as hotwords and used by AI polish — the #1 lever for proper-noun accuracy."))
+                    Text(tr("这些词会作为热词直接送入识别模型，并参与 AI 润色纠错——专有名词识别准确率的第一杠杆，强烈建议填写。\n支持硬替换：填「杰文=捷文」表示识别出的"杰文"一律改成"捷文"——确定性替换、零耗时，对完全同音的人名最有效。",
+                            "These terms are fed to the speech model as hotwords and used by AI polish — the #1 lever for proper-noun accuracy.\nHard replacement supported: an entry like \"Jevin=Jaywen\" deterministically rewrites every occurrence — zero latency, ideal for exact-homophone names."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -504,8 +504,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.2.8 · Qwen3-ASR 引擎 + 语音指令",
-                    "Version 3.2.8 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.2.9 · Qwen3-ASR 引擎 + 语音指令",
+                    "Version 3.2.9 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))
