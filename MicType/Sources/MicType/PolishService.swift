@@ -5,8 +5,7 @@ enum PolishService {
 
     /// 润色。completion 在主线程回调：(润色结果, 失败原因)。
     /// 结果为 nil 时调用方降级用原文，失败原因用于提示用户。
-    /// scene：当前目标应用的场景分类，仅深度润色用于风格适配。
-    static func polish(_ rawText: String, level: PolishLevel, scene: AppScene = .unknown,
+    static func polish(_ rawText: String, level: PolishLevel,
                        completion: @escaping (String?, String?) -> Void) {
         guard level != .off else {
             DispatchQueue.main.async { completion(rawText, nil) }
@@ -15,7 +14,7 @@ enum PolishService {
 
         // 示例已内嵌进系统提示词——few-shot 消息对在短输入时会被模型原样"复读"出来
         let messages: [[String: String]] = [
-            ["role": "system", "content": systemPrompt(for: level, scene: scene)],
+            ["role": "system", "content": systemPrompt(for: level)],
             ["role": "user", "content": rawText],
         ]
 
@@ -27,7 +26,7 @@ enum PolishService {
 
     // MARK: - 提示词
 
-    private static func systemPrompt(for level: PolishLevel, scene: AppScene = .unknown) -> String {
+    private static func systemPrompt(for level: PolishLevel) -> String {
         var prompt = """
         你是一个语音输入润色引擎。用户发来的是语音识别的原始文本，你输出处理后的文本。通用规则：
         1.【最重要】绝对禁止翻译！说话人用什么语言，就输出什么语言——中文、English、日本語、한국어、Français 或任何语言都一样；多语言混合就保持混合，逐句跟随原文语言。这是语音输入工具，说话人怎么说就怎么写。
@@ -55,9 +54,6 @@ enum PolishService {
         轻清理：输入「嗯我现在在用这个语音输入法给你发消息呃看看效果」→ 输出「我现在在用这个语音输入法给你发消息，看看效果。」
         重构：输入「嗯我想说一下就是那个方案的事呃其实我们时间不太够然后人也不够就是说按原计划走的话风险挺大的所以要么砍范围要么往后推嗯就这个意思」→ 输出「关于方案：目前时间和人手都不够，按原计划推进风险很大。建议二选一：砍范围，或者延期。」
         """
-        if scene != .unknown {
-            prompt += "\n\n当前输出场景：\(scene.styleHint)"
-        }
 
         let vocab = Settings.shared.vocabularyTerms
         if !vocab.isEmpty {

@@ -100,7 +100,6 @@ enum SettingsKeys {
     static let customVocabulary = "customVocabulary"
     static let playSounds = "playSounds"
     static let restoreClipboard = "restoreClipboard"
-    static let smartLevel = "smartLevel"
     static let qwenModelRepo = "qwenModelRepo"
     static let llmProvider = "llmProvider"
     static let appLanguage = "appLanguage"
@@ -126,7 +125,6 @@ final class Settings {
             SettingsKeys.customVocabulary: "",
             SettingsKeys.playSounds: true,
             SettingsKeys.restoreClipboard: true,
-            SettingsKeys.smartLevel: false,
             SettingsKeys.qwenModelRepo: QwenModels.defaultRepo,
             SettingsKeys.skillsEnabled: true,
             SettingsKeys.llmProvider: LLMProvider.openai.rawValue,
@@ -210,12 +208,6 @@ final class Settings {
     var restoreClipboard: Bool {
         get { d.bool(forKey: SettingsKeys.restoreClipboard) }
         set { d.set(newValue, forKey: SettingsKeys.restoreClipboard) }
-    }
-
-    /// 智能档位：按当前应用自动选择润色档
-    var smartLevelEnabled: Bool {
-        get { d.bool(forKey: SettingsKeys.smartLevel) }
-        set { d.set(newValue, forKey: SettingsKeys.smartLevel) }
     }
 
     /// 润色/技能使用的大模型服务商（GPT 或 DeepSeek，二选一）

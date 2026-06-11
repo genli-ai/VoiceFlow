@@ -14,24 +14,25 @@ Tap ⌥ → speak → tap ⌥ again
 Local Qwen3-ASR transcription (offline, MLX/Metal accelerated, audio never uploaded)
    ↓
 Optional adaptive AI polish (remove fillers, fix homophone errors,
-restructure long rambling speech — styled for the target app)
+restructure long rambling speech into ready-to-use text)
    ↓
 Clean text appears at your cursor
 ```
 
-**Hold Right Option (⌥) = voice command.** Speak while holding, release to run:
+**Hold Right Option (⌥) = voice command.** Speak while holding, release to run. With text selected, AI infers what you want from what you say — no fixed magic words:
 
-- **Text selected** → say *"make it more formal"* / *"translate to English"* — the selection is replaced in place
-- **A message selected** → say *"help me reply: agree, but push it to next week"* — a ready-to-send draft lands on your clipboard, press ⌘V
-- **Nothing selected** → free-form AI at your cursor: *"draft an email to the team about Friday's release"*, *"translate this sentence into Japanese: …"*, or just ask a question — the answer is typed where you are
+- *"make it more formal"* / *"translate to English"* → the **selection is rewritten** in place
+- *"reply to him: agree, but push it to next week"* → a ready-to-send **reply draft** lands on your clipboard, press ⌘V
+- *"based on this, write a congratulations message"* → **new text** is typed at your cursor, selection used as reference
+- Nothing selected → free-form AI at your cursor: draft an email, translate, or just ask a question
 
-Intent is decided by gesture, never by guessing: tap is always pure dictation (what you say is what gets typed), hold is always a command. Esc cancels any recording.
+Tap is always pure dictation (what you say is what gets typed), hold is always a command — that part is decided by gesture, never by guessing. Esc cancels any recording.
 
 ## Why MicType
 
 - **100% local speech recognition** — Qwen3-ASR on Apple Silicon (MLX/Metal): ~30 languages, 22 Chinese dialects, strong Chinese–English mixed dictation. Audio never leaves your Mac.
 - **Voice commands in any app** — the hold gesture works wherever your cursor is: chat, mail, docs, browser.
-- **Adaptive AI polish** — short phrases get light cleanup; long rambling speech is restructured into ready-to-use text; style adapts to the target app (chat / email / document). Code editors and terminals can auto-switch to transcribe-only.
+- **Adaptive AI polish** — short phrases get light cleanup; long rambling speech is restructured into ready-to-use text. Same rules in every app; the polish mode is entirely your choice.
 - **Custom vocabulary as hotwords** — names, brands, and jargon are fed straight into the speech model and used by AI polish: the #1 lever for proper-noun accuracy.
 - **Bring your own model** — GPT or DeepSeek (both keys can be saved), any OpenAI-compatible endpoint. Keys live in the macOS Keychain. No key? MicType still works fully offline as a dictation tool.
 - **Bilingual UI** — English / 中文, switch instantly in Settings.
@@ -65,7 +66,6 @@ Polish modes:
 
 - **Transcribe only**: fully offline, fastest
 - **AI polish (adaptive)**: light cleanup for short phrases; full restructuring for long spoken paragraphs
-- Optional: **auto transcribe-only in code tools** (VS Code / Xcode / Terminal …) so polish never touches technical content
 
 Voice commands use the same provider and key.
 
@@ -118,8 +118,8 @@ MicType/
 │   ├── QwenEngine.swift           # Local Qwen3-ASR inference (MLX)
 │   ├── QwenModelDownloader.swift  # In-app model download and update check
 │   ├── PolishService.swift        # Adaptive AI polish
-│   ├── AgentService.swift         # LLM client + voice-command skills (modify / reply / free-form)
-│   ├── SkillRouter.swift          # Scene classification & reply-trigger detection
+│   ├── AgentService.swift         # LLM client + voice-command skills (intent-inferred selection commands / reply / free-form)
+│   ├── SkillRouter.swift          # Explicit reply-trigger fast path
 │   ├── SelectionReader.swift      # Read selected text via Accessibility (⌘C fallback)
 │   ├── TextInserter.swift         # Clipboard + ⌘V insertion, clipboard restore
 │   ├── Overlay.swift              # Floating bottom indicator
@@ -153,24 +153,25 @@ This project was designed, implemented, debugged, and refined with AI collaborat
 本地 Qwen3-ASR 识别（离线，MLX/Metal 加速，录音不上传）
    ↓
 可选自适应 AI 润色（去口头禅、修同音错字，
-长段混乱口述自动重构——并按目标应用适配文风）
+长段混乱口述自动重构成可直接使用的成品文字）
    ↓
 干净的文字出现在光标处
 ```
 
-**按住 右 Option (⌥) = 语音指令**——按住说话，松手执行：
+**按住 右 Option (⌥) = 语音指令**——按住说话，松手执行。选中文字后随便怎么说，AI 自动听懂你要什么，不需要固定句式：
 
-- **选中了文字** → 说「改得正式一点」「翻译成英文」——选区原地被替换
-- **选中了对方消息** → 说「帮我回复：同意，但推到下周」——可直接发送的草稿进剪贴板，按 ⌘V 即贴
-- **什么都没选** → 光标处的自由 AI：「给团队草拟一封周五上线的邮件」「把这句话翻译成日语：…」，或者直接问问题——答案直接打在当前位置
+- 「改得正式一点」「翻译成英文」→ **选区原地被改写**
+- 「回复他：同意，但推到下周」→ 可直接发送的**回复草稿**进剪贴板，按 ⌘V 即贴
+- 「根据这段写一条祝贺消息」→ **新内容**打在光标处，选中文字只作参考
+- 什么都没选 → 光标处的自由 AI：草拟邮件、翻译、或者直接问问题
 
-意图靠手势区分，永不猜测：轻点永远是纯听写（说什么打什么），按住永远是指令。录音中按 Esc 随时取消。
+轻点永远是纯听写（说什么打什么），按住永远是指令——这一层靠手势区分，永不猜测。录音中按 Esc 随时取消。
 
 ## 为什么选 MicType
 
 - **识别 100% 本地**——Apple Silicon 上跑 Qwen3-ASR（MLX/Metal）：约 30 种语言 + 22 种中文方言，中英混说尤其强。录音永远不离开你的 Mac
 - **任何应用里都能下指令**——光标在哪，按住就在哪用：聊天、邮件、文档、浏览器
-- **自适应 AI 润色**——短句轻清理；长段混乱口述重构成可直接使用的成品文字；文风按目标应用（聊天/邮件/文档）适配；代码编辑器和终端可自动切为仅识别
+- **自适应 AI 润色**——短句轻清理；长段混乱口述重构成可直接使用的成品文字。所有应用同一套规则，档位完全由你决定
 - **专有词汇表 = 热词**——人名、品牌、术语直接送入识别模型并参与润色纠错，是专有名词准确率的第一杠杆
 - **模型自带**——GPT 或 DeepSeek（两个 Key 可同时保存），任何 OpenAI 兼容接口均可。Key 存 macOS 钥匙串。不填 Key 也完全可用：纯离线听写
 - **中英双语界面**——设置里即时切换
@@ -204,7 +205,6 @@ This project was designed, implemented, debugged, and refined with AI collaborat
 
 - **仅识别**：完全不联网，最快
 - **AI 润色（自适应）**：短句轻清理；长段口述自动重构
-- 可选：**代码工具自动仅识别**（VS Code / Xcode / 终端等），润色永不干扰技术内容
 
 语音指令与润色共用同一个服务商和 Key。
 

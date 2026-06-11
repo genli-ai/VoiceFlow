@@ -254,7 +254,6 @@ private struct RecognitionTab: View {
 private struct PolishTab: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage(SettingsKeys.polishLevel) private var polishLevel = PolishLevel.smart.rawValue
-    @AppStorage(SettingsKeys.smartLevel) private var smartLevel = false
     @AppStorage(SettingsKeys.skillsEnabled) private var skillsEnabled = true
     @AppStorage(SettingsKeys.llmProvider) private var provider = LLMProvider.openai.rawValue
     @AppStorage(SettingsKeys.openaiBaseURL) private var baseURL = "https://api.openai.com/v1"
@@ -277,21 +276,16 @@ private struct PolishTab: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
-                Text(tr("「仅识别」完全不联网；「AI 润色」自适应处理力度——短句只做轻清理（去语气词、修错字），长段混乱口述自动重构成可直接使用的成品文字，并按目标应用（聊天/邮件/文档）适配风格。菜单栏图标里可以快速切换。",
-                        "Transcribe-only never touches the network. AI polish adapts: short phrases get light cleanup (fillers, typos); long rambling speech gets restructured into ready-to-use text, styled for the target app (chat/email/document). Switch quickly from the menu bar."))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Toggle(tr("代码工具自动仅识别", "Transcribe-only in code tools"), isOn: $smartLevel)
-                Text(tr("在代码编辑器和终端（VS Code/Xcode/Terminal 等）里自动切为仅识别，避免润色干扰技术内容。",
-                        "Automatically switch to transcribe-only in code editors and terminals (VS Code/Xcode/Terminal) so polish never touches technical content."))
+                Text(tr("「仅识别」完全不联网；「AI 润色」自适应处理力度——短句只做轻清理（去语气词、修错字），长段混乱口述自动重构成可直接使用的成品文字。所有应用同一套规则，档位完全由你决定；菜单栏图标里可以快速切换。",
+                        "Transcribe-only never touches the network. AI polish adapts: short phrases get light cleanup (fillers, typos); long rambling speech gets restructured into ready-to-use text. Same rules in every app — the mode is entirely your choice. Switch quickly from the menu bar."))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Section {
                 Toggle(tr("语音技能", "Voice commands"), isOn: $skillsEnabled)
-                Text(tr("意图靠手势区分，永不误判：轻点快捷键 = 纯语音输入，说什么打什么；按住快捷键说话、松手执行 = 指令模式——选中文字后按住说「改正式一点 / 翻译成英文」直接替换选区；选中对方消息后按住说「帮我回复…」草稿进剪贴板；什么都没选就是自由指令（草拟邮件、翻译、提问）。",
-                        "Intent is decided by gesture, never by guessing: tap = pure dictation, whatever you say gets typed. Hold = command mode — with text selected, say \"make it formal / translate to English\" to replace the selection; with a message selected, say \"help me reply…\" to get a draft on the clipboard; with nothing selected it's a free-form command (draft an email, translate, ask anything)."))
+                Text(tr("轻点快捷键 = 纯语音输入，说什么打什么；按住快捷键说话、松手执行 = 指令模式。选中文字后按住开口，AI 自动判断意图：要求加工这段文字（改写/翻译）→ 直接替换选区；要求回复对方（「回复他…」「跟他说…」）→ 草稿进剪贴板按 ⌘V；要求写新东西 → 结果输出到光标处。什么都没选就是自由指令（草拟邮件、翻译、提问）。",
+                        "Tap = pure dictation, whatever you say gets typed. Hold = command mode. With text selected, speak naturally and AI infers the intent: transform the text (rewrite/translate) → selection replaced; reply to the sender (\"reply to him…\", \"tell them…\") → draft lands on the clipboard, press ⌘V; compose something new → result typed at your cursor. With nothing selected it's a free-form command (draft an email, translate, ask anything)."))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -427,8 +421,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.1.1 · Qwen3-ASR 引擎 + 语音技能",
-                    "Version 3.1.1 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.2.0 · Qwen3-ASR 引擎 + 语音技能",
+                    "Version 3.2.0 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))

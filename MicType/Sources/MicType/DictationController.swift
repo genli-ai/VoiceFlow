@@ -23,38 +23,15 @@ final class DictationController {
     private var didPromptAccessibility = false
     /// 录音开始时的前台应用（文字将粘贴到这个应用）
     private var targetBundleID = ""
-    private var targetAppName = ""
     /// 录音开始时的选中文本（V3 语音技能用；读不到为 nil）
     private var targetSelection: String?
     /// 本次录音是否为"指令模式"（按住快捷键触发）
     private var skillSession = false
 
-    // 智能档位的内置应用分类
-    private static let chatApps: Set<String> = [
-        "com.tencent.xinWeChat", "com.tencent.qq", "ru.keepcoder.Telegram",
-        "com.tinyspeck.slackmacgap", "com.hnc.Discord", "com.apple.MobileSMS",
-        "com.alibaba.DingTalkMac", "com.electron.lark", "com.larksuite.larkApp",
-        "net.whatsapp.WhatsApp", "com.microsoft.teams2",
-    ]
-    private static let writingApps: Set<String> = [
-        "com.apple.mail", "com.microsoft.Outlook", "com.microsoft.Word",
-        "com.apple.iWork.Pages", "com.apple.Notes", "notion.id", "md.obsidian",
-        "com.lukilabs.lukiapp", "com.apple.TextEdit", "com.ulyssesapp.mac",
-    ]
-    private static let codeApps: Set<String> = [
-        "com.microsoft.VSCode", "com.apple.dt.Xcode", "com.apple.Terminal",
-        "com.googlecode.iterm2", "com.todesktop.230313mzl4w4u92", "dev.zed.Zed",
-    ]
     /// 无障碍接口残缺、读选区需要 ⌘C 兜底的应用
     private static let poorAXApps: Set<String> = [
         "com.tencent.xinWeChat", "com.tencent.qq",
     ]
-
-    /// 智能档位（简化版）：代码工具里自动切为仅识别，避免润色干扰技术内容
-    private static func smartLevel(for bundleID: String, fallback: PolishLevel) -> PolishLevel {
-        if codeApps.contains(bundleID) { return .off }
-        return fallback
-    }
 
     // MARK: - 入口
 
@@ -129,7 +106,6 @@ final class DictationController {
             guard self.phase == .idle else { return }
             let frontmost = NSWorkspace.shared.frontmostApplication
             self.targetBundleID = frontmost?.bundleIdentifier ?? ""
-            self.targetAppName = frontmost?.localizedName ?? ""
             // 指令模式才读选区——普通输入完全不碰选区和剪贴板
             self.skillSession = skill
             self.targetSelection = skill ? SelectionReader.readSelectedText() : nil
@@ -198,20 +174,11 @@ final class DictationController {
                     self.runSkillSession(rawText: rawText, isColdStart: isColdStart)
                     return
                 }
-                var level = Settings.shared.polishLevel
-                // 智能档位只在手动档为标准/深度时介入；手动选了"仅识别"= 永不联网，智能档位让位
-                if Settings.shared.smartLevelEnabled, level != .off {
-                    level = Self.smartLevel(for: self.targetBundleID, fallback: level)
-                }
+                let level = Settings.shared.polishLevel
                 if level != .off, KeychainHelper.loadAPIKey() != nil {
-                    var label = tr("润色中…", "Polishing…")
-                    if Settings.shared.smartLevelEnabled, !self.targetAppName.isEmpty {
-                        label += "（\(self.targetAppName)）"
-                    }
-                    self.overlay.showProcessing(label)
+                    self.overlay.showProcessing(tr("润色中…", "Polishing…"))
                     let tPolish = Date()
-                    let scene = SceneClassifier.scene(for: self.targetBundleID)
-                    PolishService.polish(rawText, level: level, scene: scene) { [weak self] polished, failure in
+                    PolishService.polish(rawText, level: level) { [weak self] polished, failure in
                         guard let self = self else { return }
                         let polishSeconds = Date().timeIntervalSince(tPolish)
                         let timing = String(format: tr("识别 %.1fs · 润色 %.1fs", "ASR %.1fs · polish %.1fs"),
@@ -241,14 +208,16 @@ final class DictationController {
 
     // MARK: - V3 语音技能（仅指令模式进入）
 
-    /// 指令分发：说「帮我回复…」→ 草拟回复；有选区 → 把整句话当修改指令；都没有 → 明确报错
+    /// 指令分发：显式说「帮我回复…」→ 直通草拟回复；有选区 → 模型自判意图（改写/回复/新写）；
+    /// 没选区 → 自由指令
     private func runSkillSession(rawText: String, isColdStart: Bool) {
         if SkillRouter.isReplyTrigger(rawText) {
             runReplyDraft(instruction: rawText, raw: rawText)
             return
         }
-        if targetSelection != nil {
-            runModifySelection(instruction: rawText, raw: rawText, isColdStart: isColdStart)
+        if let selection = targetSelection {
+            runSelectionCommand(selection: selection, instruction: rawText, raw: rawText,
+                                isColdStart: isColdStart)
             return
         }
         // 没选区：当作自由指令——口述任务（草拟邮件/翻译/提问…），结果粘贴到光标处
@@ -258,8 +227,7 @@ final class DictationController {
     /// 技能：自由指令——指令模式下的"万能入口"
     private func runFreeform(instruction: String, raw: String, isColdStart: Bool) {
         overlay.showProcessing(tr("执行指令中…", "Running command…"))
-        let scene = SceneClassifier.scene(for: targetBundleID)
-        AgentService.freeform(instruction: instruction, scene: scene) { [weak self] result, failure in
+        AgentService.freeform(instruction: instruction) { [weak self] result, failure in
             guard let self = self else { return }
             if let result = result {
                 self.deliver(raw: raw, final: result, note: tr("已输入指令结果", "Command result inserted"),
@@ -272,26 +240,48 @@ final class DictationController {
         }
     }
 
-    /// 技能：修改选中文本——结果直接粘贴覆盖仍处于选中状态的文字
-    private func runModifySelection(instruction: String, raw: String, isColdStart: Bool) {
-        guard let selection = targetSelection else {
-            phase = .idle
-            overlay.flashError(tr("没有读到选中文本", "Could not read selected text"))
-            Sounds.playError()
-            return
-        }
+    /// 技能：有选区的指令——模型自判意图后按意图投递：
+    /// 改写 → 粘贴替换选区；回复 → 草稿进剪贴板；新写 → 粘贴到光标处；
+    /// 意图解析失败 → 结果进剪贴板（绝不误覆盖选区）
+    private func runSelectionCommand(selection: String, instruction: String, raw: String,
+                                     isColdStart: Bool) {
         overlay.showProcessing(tr("执行指令中…", "Running command…"))
-        AgentService.modifySelection(selection, instruction: instruction) { [weak self] result, failure in
+        AgentService.runOnSelection(selection, instruction: instruction) { [weak self] action, result, failure in
             guard let self = self else { return }
-            if let result = result {
-                self.deliver(raw: raw, final: result, note: tr("已替换选中文本", "Selection replaced"),
-                             allowClipboardRestore: !isColdStart)
-            } else {
+            guard let result = result else {
                 self.phase = .idle
                 self.overlay.flashError(tr("指令执行失败（", "Command failed (") + (failure ?? tr("未知", "unknown")) + tr("）", ")"))
                 Sounds.playError()
+                return
+            }
+            switch action {
+            case .modify:
+                self.deliver(raw: raw, final: result, note: tr("已替换选中文本", "Selection replaced"),
+                             allowClipboardRestore: !isColdStart)
+            case .new:
+                self.deliver(raw: raw, final: result, note: tr("已输入指令结果", "Command result inserted"),
+                             allowClipboardRestore: !isColdStart)
+            case .reply:
+                self.copyToClipboard(raw: raw, result: result,
+                                     note: tr("回复草稿已复制——点到输入框按 ⌘V", "Reply draft copied — click the input field and press ⌘V"))
+            case nil:
+                // 意图行没解析出来：进剪贴板最安全，不碰选区
+                self.copyToClipboard(raw: raw, result: result,
+                                     note: tr("结果已复制到剪贴板——按 ⌘V 粘贴", "Result copied — press ⌘V to paste"))
             }
         }
+    }
+
+    /// 结果进剪贴板（不自动粘贴），记录历史并提示
+    private func copyToClipboard(raw: String, result: String, note: String) {
+        phase = .idle
+        let final = TextPostProcessor.fixMixedPunctuation(result)
+        HistoryStore.shared.add(raw: raw, polished: final)
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(final, forType: .string)
+        overlay.flashSuccess(note)
+        Sounds.playSuccess()
     }
 
     /// 技能：帮我回复——基于选中的对方消息草拟回复。
@@ -317,19 +307,13 @@ final class DictationController {
 
     private func executeReplyDraft(context: String, instruction: String, raw: String) {
         overlay.showProcessing(tr("草拟回复中…", "Drafting reply…"))
-        let scene = SceneClassifier.scene(for: targetBundleID)
-        AgentService.replyDraft(context: context, instruction: instruction, scene: scene) { [weak self] result, failure in
+        AgentService.replyDraft(context: context, instruction: instruction) { [weak self] result, failure in
             guard let self = self else { return }
-            self.phase = .idle
             if let result = result {
-                let final = TextPostProcessor.fixMixedPunctuation(result)
-                HistoryStore.shared.add(raw: raw, polished: final)
-                let pb = NSPasteboard.general
-                pb.clearContents()
-                pb.setString(final, forType: .string)
-                self.overlay.flashSuccess(tr("回复草稿已复制——点到输入框按 ⌘V", "Reply draft copied — click the input field and press ⌘V"))
-                Sounds.playSuccess()
+                self.copyToClipboard(raw: raw, result: result,
+                                     note: tr("回复草稿已复制——点到输入框按 ⌘V", "Reply draft copied — click the input field and press ⌘V"))
             } else {
+                self.phase = .idle
                 self.overlay.flashError(tr("草拟失败（", "Draft failed (") + (failure ?? tr("未知", "unknown")) + tr("）", ")"))
                 Sounds.playError()
             }
