@@ -1,6 +1,9 @@
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MicType.Win.Core;
 using Forms = System.Windows.Forms;
 
 namespace MicType.Win.Views;
@@ -66,8 +69,50 @@ public partial class OverlayWindow : Window
 
     private void Position()
     {
-        var area = Forms.Screen.FromPoint(Forms.Cursor.Position).WorkingArea;
-        Left = area.Left + (area.Width - Width) / 2;
-        Top = area.Bottom - Height - 28;
+        var cursor = Forms.Cursor.Position;
+        var screen = Forms.Screen.FromPoint(cursor);
+        var area = screen.WorkingArea;
+        var scale = WindowsDpi.ScaleForPoint(cursor.X, cursor.Y);
+        var placement = OverlayPlacement.Calculate(
+            new PhysicalRect(area.Left, area.Top, area.Width, area.Height),
+            ActualWidth > 0 ? ActualWidth : Width,
+            ActualHeight > 0 ? ActualHeight : Height,
+            scale);
+
+        var hwnd = new WindowInteropHelper(this).EnsureHandle();
+        SetWindowPos(
+            hwnd,
+            HwndTopmost,
+            placement.X,
+            placement.Y,
+            0,
+            0,
+            SetWindowPosFlags.NoSize | SetWindowPosFlags.NoActivate);
+
+        Log.Info(
+            "Overlay position " +
+            $"screen={screen.DeviceName} primary={screen.Primary} scale={placement.Scale:0.###} " +
+            $"workAreaPx=({area.Left},{area.Top},{area.Width},{area.Height}) " +
+            $"sizePx=({placement.WidthPx},{placement.HeightPx}) " +
+            $"targetPx=({placement.X},{placement.Y}) targetDip=({placement.DipX:0.##},{placement.DipY:0.##})");
     }
+
+    private static readonly IntPtr HwndTopmost = new(-1);
+
+    [Flags]
+    private enum SetWindowPosFlags : uint
+    {
+        NoSize = 0x0001,
+        NoActivate = 0x0010
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        SetWindowPosFlags flags);
 }

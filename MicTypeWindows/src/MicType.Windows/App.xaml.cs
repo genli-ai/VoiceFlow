@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;
@@ -18,20 +19,44 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        Log.Initialize();
         base.OnStartup(e);
+        DispatcherUnhandledException += (_, args) =>
+        {
+            Log.Error(args.Exception, "Unhandled dispatcher exception");
+        };
+
         _overlay = new OverlayWindow();
         _speechEngine = new SenseVoiceSpeechEngine();
+        Log.Startup(SettingsStore.Instance.Current, _speechEngine.EngineName, _speechEngine.IsModelAvailable);
         _dictation = new DictationController(_speechEngine, _overlay);
         _speechEngine.Preload();
         _hotkeys = new GlobalHotkeyManager
         {
             IsRecording = () => _dictation?.IsRecording == true
         };
-        _hotkeys.TapToggle += () => Dispatcher.Invoke(() => _dictation.Toggle());
-        _hotkeys.SkillStart += () => Dispatcher.Invoke(() => _dictation.SkillHoldStart());
-        _hotkeys.SkillEnd += () => Dispatcher.Invoke(() => _dictation.SkillHoldEnd());
-        _hotkeys.Cancel += () => Dispatcher.Invoke(() => _dictation.Cancel());
+        _hotkeys.TapToggle += () => Dispatcher.Invoke(() =>
+        {
+            Log.Info("Hotkey tap");
+            _dictation.Toggle();
+        });
+        _hotkeys.SkillStart += () => Dispatcher.Invoke(() =>
+        {
+            Log.Info("Hotkey hold-start");
+            _dictation.SkillHoldStart();
+        });
+        _hotkeys.SkillEnd += () => Dispatcher.Invoke(() =>
+        {
+            Log.Info("Hotkey hold-end");
+            _dictation.SkillHoldEnd();
+        });
+        _hotkeys.Cancel += () => Dispatcher.Invoke(() =>
+        {
+            Log.Info("Hotkey Esc cancel");
+            _dictation.Cancel();
+        });
         _hotkeys.Start();
+        Log.Info("Global hotkeys started");
 
         _dictation.NeedSettings += ShowSettings;
         _dictation.PhaseChanged += _ => UpdateTrayText();
@@ -122,7 +147,24 @@ public partial class App : Application
 
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(L10n.Tr("设置…", "Settings…"), null, (_, _) => ShowSettings());
+        menu.Items.Add(L10n.Tr("打开日志文件夹", "Open Logs Folder"), null, (_, _) => OpenLogsFolder());
         menu.Items.Add(L10n.Tr("退出 MicType", "Quit MicType"), null, (_, _) => Shutdown());
+    }
+
+    private static void OpenLogsFolder()
+    {
+        try
+        {
+            Log.Info("Open logs folder");
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{Log.LogsDir}\"")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to open logs folder");
+        }
     }
 
     private void ShowSettings()

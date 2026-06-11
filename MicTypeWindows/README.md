@@ -13,12 +13,15 @@ This folder is the Windows implementation scaffold for MicType. It is intentiona
 - Local ASR via sherpa-onnx + SenseVoice
 - JSON settings in `%APPDATA%\MicType\settings.json`
 - SenseVoice model files in `%APPDATA%\MicType\models\sensevoice`
+- Rolling debug logs in `%APPDATA%\MicType\logs`
 - Credential Manager API key storage:
   - `MicType/openai_api_key`
   - `MicType/deepseek_api_key`
 - History in `%APPDATA%\MicType\history.json`
 
 The first run needs the SenseVoice model. Open Settings → Recognition and download the model before using dictation. MicType records 16 kHz mono audio locally, sends it to the local SenseVoice recognizer, then optionally sends text only to your configured GPT / DeepSeek API for polishing or commands.
+
+Use the tray menu item **Open Logs Folder** when remote debugging. Logs include startup environment, display DPI/working-area data, hotkey events, recording metrics, model load/transcription timings, overlay coordinates, and paste outcomes. They do not include API keys, audio, selected text, or transcript contents.
 
 ## Build
 

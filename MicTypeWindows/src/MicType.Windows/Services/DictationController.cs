@@ -62,6 +62,7 @@ public sealed class DictationController
         if (Phase != Phase.Recording) return;
         _recorder.Stop();
         _skillSession = false;
+        Log.Info("Recording cancelled by user");
         SetPhase(Phase.Idle);
         _overlay.Hide();
         Sounds.PlayCancel();
@@ -71,6 +72,7 @@ public sealed class DictationController
     {
         if (!_speechEngine.IsModelAvailable)
         {
+            Log.Warn("Start recording blocked because speech model is not available");
             _overlay.FlashError(L10n.Tr(
                 "识别模型未下载，请在设置中下载",
                 "Speech model not downloaded — see Settings"));
@@ -84,6 +86,9 @@ public sealed class DictationController
         _targetProcessName = GetProcessNameForWindow(_targetWindow);
         _skillSession = skill;
         _targetSelection = skill ? SelectionReader.ReadSelectedText() : null;
+        Log.Info(
+            "Recording start " +
+            $"skill={skill} targetProcess={_targetProcessName ?? "unknown"} targetWindow=0x{_targetWindow.ToInt64():X}");
 
         if (skill && _targetSelection is null && IsPoorSelectionApp(_targetProcessName))
         {
@@ -101,6 +106,7 @@ public sealed class DictationController
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Failed to start audio recorder");
             _overlay.FlashError(L10n.Tr("无法启动录音：", "Could not start recording: ") + ex.Message);
             Sounds.PlayError();
             return;
@@ -118,6 +124,8 @@ public sealed class DictationController
         if (Phase != Phase.Recording) return;
         var samples = _recorder.Stop();
         var duration = samples.Length / 16000.0;
+        var peak = samples.Length == 0 ? 0 : samples.Max(Math.Abs);
+        Log.Info($"Recording stop duration={duration:0.###}s samples={samples.Length} peak={peak:0.####}");
 
         if (duration < 0.4)
         {
@@ -126,7 +134,6 @@ public sealed class DictationController
             return;
         }
 
-        var peak = samples.Length == 0 ? 0 : samples.Max(Math.Abs);
         if (peak < 0.012f)
         {
             SetPhase(Phase.Idle);
@@ -149,6 +156,7 @@ public sealed class DictationController
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Transcription pipeline failed");
             SetPhase(Phase.Idle);
             _overlay.FlashError(ex is MTException mt ? mt.UserMessage : ex.Message);
             Sounds.PlayError();
@@ -157,6 +165,7 @@ public sealed class DictationController
 
         if (string.IsNullOrWhiteSpace(rawText))
         {
+            Log.Warn("Transcription returned empty text");
             SetPhase(Phase.Idle);
             _overlay.FlashError(L10n.Tr("没有听到内容", "Nothing heard"));
             return;
@@ -219,10 +228,12 @@ public sealed class DictationController
         var result = await AgentService.FreeformAsync(instruction);
         if (result.Text is not null)
         {
+            Log.Info($"Freeform command succeeded resultChars={result.Text.Length}");
             await DeliverAsync(raw, result.Text, L10n.Tr("已输入指令结果", "Command result inserted"));
         }
         else
         {
+            Log.Warn("Freeform command failed: " + (result.Error ?? "unknown"));
             Fail(L10n.Tr("指令执行失败（", "Command failed (") + (result.Error ?? L10n.Tr("未知", "unknown")) + ")");
         }
     }
@@ -234,9 +245,11 @@ public sealed class DictationController
         var result = await AgentService.RunOnSelectionAsync(selection, instruction, chatContext);
         if (result.Text is null)
         {
+            Log.Warn("Selection command failed: " + (result.Error ?? "unknown"));
             Fail(L10n.Tr("指令执行失败（", "Command failed (") + (result.Error ?? L10n.Tr("未知", "unknown")) + ")");
             return;
         }
+        Log.Info($"Selection command succeeded action={result.Action} resultChars={result.Text.Length}");
 
         switch (result.Action)
         {
@@ -266,6 +279,7 @@ public sealed class DictationController
 
         if (string.IsNullOrWhiteSpace(context))
         {
+            Log.Warn("Reply draft failed because selected context was empty");
             Fail(L10n.Tr("读不到选中内容：请重新选中要回复的消息再试", "Could not read selection — reselect the message and try again"));
             return;
         }
@@ -274,10 +288,12 @@ public sealed class DictationController
         var result = await AgentService.ReplyDraftAsync(context, instruction);
         if (result.Text is not null)
         {
+            Log.Info($"Reply draft succeeded resultChars={result.Text.Length}");
             CopyToClipboard(raw, result.Text, L10n.Tr("回复草稿已复制——点到输入框按 Ctrl+V", "Reply draft copied — click the input field and press Ctrl+V"));
         }
         else
         {
+            Log.Warn("Reply draft failed: " + (result.Error ?? "unknown"));
             Fail(L10n.Tr("草拟失败（", "Draft failed (") + (result.Error ?? L10n.Tr("未知", "unknown")) + ")");
         }
     }
@@ -290,12 +306,14 @@ public sealed class DictationController
         var outcome = await TextInserter.InsertAsync(text, _targetWindow);
         if (outcome == InsertOutcome.Pasted)
         {
+            Log.Info($"Deliver pasted rawChars={raw.Length} finalChars={text.Length} warning={warning}");
             if (warning) _overlay.FlashError(note);
             else _overlay.FlashSuccess(note);
             Sounds.PlaySuccess();
         }
         else
         {
+            Log.Warn($"Deliver fell back to clipboard rawChars={raw.Length} finalChars={text.Length}");
             _overlay.FlashError(L10n.Tr("窗口已切换，文本已复制到剪贴板——按 Ctrl+V 粘贴", "Window changed — text copied to clipboard, press Ctrl+V to paste"));
             Sounds.PlayError();
         }
@@ -307,12 +325,14 @@ public sealed class DictationController
         HistoryStore.Instance.Add(raw, text);
         TextInserter.SetClipboardText(text);
         SetPhase(Phase.Idle);
+        Log.Info($"Copied result to clipboard rawChars={raw.Length} finalChars={text.Length}");
         _overlay.FlashSuccess(note);
         Sounds.PlaySuccess();
     }
 
     private void Fail(string message)
     {
+        Log.Warn("User-visible failure: " + message);
         SetPhase(Phase.Idle);
         _overlay.FlashError(message);
         Sounds.PlayError();
@@ -340,8 +360,9 @@ public sealed class DictationController
         {
             return Process.GetProcessById((int)pid).ProcessName;
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error(ex, "Failed to get process name for target window");
             return null;
         }
     }
