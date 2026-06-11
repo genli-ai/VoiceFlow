@@ -116,7 +116,10 @@ final class OverlayController {
     }
 
     private func position(_ p: NSPanel) {
-        let screen = NSScreen.main ?? NSScreen.screens.first
+        // 多屏：跟随鼠标所在屏幕（用户正在操作的那块屏），固定主屏会让悬浮窗"消失"在别的屏上
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) })
+            ?? NSScreen.main ?? NSScreen.screens.first
         guard let frame = screen?.visibleFrame else { return }
         let x = frame.midX - p.frame.width / 2
         let y = frame.minY + 28

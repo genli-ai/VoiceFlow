@@ -1,0 +1,53 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "MicTypeWindows/**"
+      - ".github/workflows/windows-build.yml"
+  pull_request:
+    paths:
+      - "MicTypeWindows/**"
+      - ".github/workflows/windows-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore MicTypeWindows/src/MicType.Windows/MicType.Windows.csproj
+
+      - name: Build (Debug)
+        run: dotnet build MicTypeWindows/src/MicType.Windows/MicType.Windows.csproj -c Debug --no-restore
+
+      - name: Test
+        run: |
+          if (Test-Path "MicTypeWindows/tests") {
+            dotnet test MicTypeWindows/tests -c Debug
+          } else {
+            Write-Host "No tests yet - skipping"
+          }
+        shell: pwsh
+
+      - name: Publish (win-x64, self-contained)
+        run: >
+          dotnet publish MicTypeWindows/src/MicType.Windows/MicType.Windows.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o MicTypeWindows/publish
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MicType-windows-x64
+          path: MicTypeWindows/publish/
+          retention-days: 30

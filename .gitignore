@@ -10,11 +10,8 @@ MicType-v*.dmg
 release/
 scripts/maintainer/
 .vscode/
-MicTypeWindows/src/**/bin/
-MicTypeWindows/src/**/obj/
-MicTypeWindows/artifacts/
-
 # Windows port build artifacts
 MicTypeWindows/**/bin/
 MicTypeWindows/**/obj/
 MicTypeWindows/**/publish/
+MicTypeWindows/artifacts/
