@@ -34,6 +34,21 @@ enum LLMClient {
                      timeout: TimeInterval,
                      model: String,
                      completion: @escaping (String?, String?) -> Void) {
+        perform(messages: messages, temperature: temperature, timeout: timeout, model: model) { result, failure in
+            // 推理系模型（gpt-5.5 / *-pro 等）只接受默认 temperature：被拒时去掉该参数重试一次
+            if result == nil, let failure = failure, failure.lowercased().contains("temperature") {
+                perform(messages: messages, temperature: nil, timeout: timeout, model: model, completion: completion)
+            } else {
+                completion(result, failure)
+            }
+        }
+    }
+
+    private static func perform(messages: [[String: String]],
+                                temperature: Double?,
+                                timeout: TimeInterval,
+                                model: String,
+                                completion: @escaping (String?, String?) -> Void) {
         guard let apiKey = KeychainHelper.loadAPIKey() else {
             DispatchQueue.main.async { completion(nil, tr("未配置 API Key", "No API key configured")) }
             return
@@ -45,11 +60,13 @@ enum LLMClient {
             return
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
-            "temperature": temperature,
             "messages": messages,
         ]
+        if let temperature = temperature {
+            body["temperature"] = temperature
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
