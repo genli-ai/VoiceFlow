@@ -29,7 +29,7 @@ enum LLMClient {
 
     /// 调用 chat/completions。completion 在主线程回调：(结果, 失败原因)。
     /// model：润色传 currentPolishModel（快），指令传 currentCommandModel（强）。
-    /// temperature：润色传 0.25（保真任务要低温）；指令传 nil 用模型默认（更自然，且推理系模型只接受默认）。
+    /// temperature：润色传 0.5（保真任务要偏低温）；指令传 nil 用模型默认（更自然，且推理系模型只接受默认）。
     static func chat(messages: [[String: String]],
                      temperature: Double?,
                      timeout: TimeInterval,
@@ -177,8 +177,9 @@ enum AgentService {
     }
 
     /// 技能：有选区时的统一入口——模型先判意图（改写/回复/新写）再直接执行，单次调用。
+    /// chatContext：选区来自聊天软件的消息记录（微信/QQ 等）——对方的话无法被原地修改，意图基本排除 MODIFY。
     /// completion(意图, 正文, 失败原因)：正文非 nil 即成功；意图为 nil 表示首行解析失败，调用方走剪贴板兜底。
-    static func runOnSelection(_ selection: String, instruction: String,
+    static func runOnSelection(_ selection: String, instruction: String, chatContext: Bool,
                                completion: @escaping (SelectionAction?, String?, String?) -> Void) {
         var system = """
         你是语音指令执行器。用户选中了一段文本，并对它口述了一条指令。你先判断意图，再直接执行。
@@ -187,6 +188,7 @@ enum AgentService {
         REPLY——选中文本是别人发来的消息或邮件，指令是要代用户起草一条回复（如「回复他/这个人…」「跟他说…」「答应/拒绝/谢谢他」）。
         NEW——指令是要写新内容或回答问题，选中文本只是参考材料，或与任务无关。
         判断依据：指令的动作落在「这段文字」上→MODIFY；落在「发来这段文字的人」上→REPLY；都不是→NEW。
+        判定示例：「改得正式一点」「翻译成英文」→MODIFY；「回复这个同事」「帮他回个话」「跟他说我同意」→REPLY；「根据这段写个总结」「这是什么意思」→NEW。
         从第二行起输出执行结果，规则按意图执行：
         - MODIFY：严格按指令修改；指令未涉及的部分保持原样；保持原文语言（除非指令明确要求翻译）；保留人名、日期、数字、条件、否定等事实。
         - REPLY：代用户口吻起草可直接发送的回复，自然得体、不卑不亢；口述里的具体要求（同意/拒绝/要点/语气）必须严格体现；不编造用户没表达的承诺；语言与对方消息一致，除非用户另有要求。【铁律】回复必须是你新撰写的内容，绝不复述、拼接或改写选中文本里对方说的话。
@@ -196,6 +198,9 @@ enum AgentService {
         if let vocab = vocabHint() { system += vocab }
         system += userContextHint()
         var user = "指令：\(instruction)\n\n选中文本：\n\(selection)"
+        if chatContext {
+            user += "\n\n（背景事实：选中文本来自聊天软件的消息记录，是对方发来的话，无法被原地修改。除非指令明确要求加工这段文字本身，意图应为 REPLY 或 NEW。）"
+        }
         if let email = emailFormatRequirement(for: instruction) { user += email }
         LLMClient.chat(messages: [
             ["role": "system", "content": system],

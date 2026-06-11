@@ -18,8 +18,9 @@ enum PolishService {
             ["role": "user", "content": rawText],
         ]
 
+        // 0.5：长口述重构需要一点文笔流畅度；再高怕 nano 这类小模型自由发挥违反保真红线
         LLMClient.chat(messages: messages,
-                       temperature: 0.25,
+                       temperature: 0.5,
                        timeout: 20,
                        model: Settings.shared.currentPolishModel,
                        completion: completion)

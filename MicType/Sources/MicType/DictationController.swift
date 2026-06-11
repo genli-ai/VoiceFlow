@@ -249,7 +249,9 @@ final class DictationController {
     private func runSelectionCommand(selection: String, instruction: String, raw: String,
                                      isColdStart: Bool) {
         overlay.showProcessing(tr("执行指令中…", "Running command…"))
-        AgentService.runOnSelection(selection, instruction: instruction) { [weak self] action, result, failure in
+        // 微信/QQ 的选区是消息记录（对方的话），物理上不存在"原地改写"——把这个事实告诉模型
+        let chatContext = Self.poorAXApps.contains(targetBundleID)
+        AgentService.runOnSelection(selection, instruction: instruction, chatContext: chatContext) { [weak self] action, result, failure in
             guard let self = self else { return }
             guard let result = result else {
                 self.phase = .idle
