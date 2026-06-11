@@ -44,7 +44,7 @@ Tap is always pure dictation (what you say is what gets typed), hold is always a
 
 Requirements: **Apple Silicon + macOS 15+**. (Building from source additionally needs full Xcode — MLX compiles Metal shaders.)
 
-**Prebuilt (recommended):** download the latest package from [GitHub Releases](https://github.com/genli-ai/MicType/releases/latest), unzip, and drag `MicType.app` to Applications. **First launch:** if macOS blocks the app ("Apple could not verify…"), open System Settings → Privacy & Security and click **Open Anyway**. A notarized DMG that opens with no warnings is on its way to Releases.
+**Prebuilt (recommended):** download `MicType-{version}-arm64.dmg` from [GitHub Releases](https://github.com/genli-ai/MicType/releases/latest), open it, and drag `MicType.app` to Applications. The DMG is **notarized by Apple — it opens with zero security warnings**. (A `.zip` is also attached; that build is ad-hoc signed, so first launch needs System Settings → Privacy & Security → **Open Anyway**.)
 
 **From source, three steps:**
 
@@ -189,7 +189,7 @@ This project was designed, implemented, debugged, and refined with AI collaborat
 
 要求：**Apple Silicon + macOS 15+**（从源码编译另需完整 Xcode——MLX 要编译 Metal 着色器）。
 
-**预编译包（推荐）**：从 [GitHub Releases](https://github.com/genli-ai/MicType/releases/latest) 下载最新包，解压后把 `MicType.app` 拖进应用程序。**首次打开**：若 macOS 提示"无法验证开发者"，到 系统设置 → 隐私与安全性 → 点「仍要打开」。已通过 Apple 公证、打开零拦截的 DMG 稍后会附到 Releases。
+**预编译包（推荐）**：从 [GitHub Releases](https://github.com/genli-ai/MicType/releases/latest) 下载 `MicType-{版本}-arm64.dmg`，打开后把 `MicType.app` 拖进应用程序。DMG **已通过 Apple 公证，打开零拦截、零警告**。（同时附有 `.zip`；zip 为 ad-hoc 签名，首次打开需到 系统设置 → 隐私与安全性 → 点「仍要打开」。）
 
 **源码安装三步**：
 
