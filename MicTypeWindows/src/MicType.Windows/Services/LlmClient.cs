@@ -29,8 +29,9 @@ public static class LlmClient
         {
             using var _ = await Client.SendAsync(request, cts.Token);
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error(ex, "LLM prewarm failed");
             // Deliberately ignored: this is a latency prewarm only.
         }
     }
@@ -108,13 +109,16 @@ public static class LlmClient
                     ? (null, L10n.Tr("模型返回了空内容", "Model returned empty content"))
                     : (content, null);
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
+                Log.Error(ex, $"LLM request timed out attempt={attempt + 1} model={model}");
+                Log.Warn($"LLM request timed out attempt={attempt + 1} model={model}");
                 if (attempt == 0) continue;
                 return (null, L10n.Tr("请求超时（已重试，网络到 API 太慢）", "Request timed out (retried — network to the API is slow)"));
             }
             catch (HttpRequestException ex)
             {
+                Log.Error(ex, $"LLM HTTP request failed attempt={attempt + 1} model={model}");
                 if (attempt == 0) continue;
                 return (null, ex.Message + L10n.Tr("（已重试）", " (retried)"));
             }
@@ -151,8 +155,9 @@ public static class LlmClient
                 detail = "：" + json.Error.Message[..Math.Min(60, json.Error.Message.Length)];
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error(ex, "Failed to parse LLM error body");
             // ignore malformed error bodies
         }
 

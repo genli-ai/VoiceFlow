@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MicType.Win.Core;
 using SherpaOnnx;
 
@@ -22,20 +23,23 @@ public sealed class SenseVoiceSpeechEngine : ISpeechEngine
     public void Preload()
     {
         if (!IsModelAvailable || IsModelLoaded) return;
+        Log.Info("Speech engine preload requested");
         _ = Task.Run(async () =>
         {
             try
             {
                 await EnsureRecognizerAsync(CancellationToken.None);
             }
-            catch
+            catch (Exception ex)
             {
+                Log.Error(ex, "Speech engine preload failed");
             }
         });
     }
 
     public void UnloadModel()
     {
+        Log.Info("Speech engine unload requested");
         _recognizer?.Dispose();
         _recognizer = null;
     }
@@ -45,20 +49,25 @@ public sealed class SenseVoiceSpeechEngine : ISpeechEngine
         if (samples.Length == 0) return "";
 
         await _decodeLock.WaitAsync(cancellationToken);
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var recognizer = await EnsureRecognizerAsync(cancellationToken);
             using var stream = recognizer.CreateStream();
             stream.AcceptWaveform(16000, samples);
             recognizer.Decode(stream);
-            return stream.Result.Text.Trim();
+            var text = stream.Result.Text.Trim();
+            Log.Info($"Transcription completed elapsedMs={stopwatch.ElapsedMilliseconds} resultChars={text.Length}");
+            return text;
         }
-        catch (MTException)
+        catch (MTException ex)
         {
+            Log.Error(ex, "Transcription failed with MTException");
             throw;
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Transcription failed");
             throw new MTException(L10n.Tr("识别失败：", "Transcription failed: ") + ex.Message);
         }
         finally
@@ -72,11 +81,13 @@ public sealed class SenseVoiceSpeechEngine : ISpeechEngine
         if (_recognizer is not null) return _recognizer;
 
         await _loadLock.WaitAsync(cancellationToken);
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             if (_recognizer is not null) return _recognizer;
             if (!IsModelAvailable)
             {
+                Log.Warn("Speech model not available");
                 throw new MTException(L10n.Tr(
                     "识别模型未下载，请在设置中下载。",
                     "Speech model not downloaded. Download it in Settings."));
@@ -97,14 +108,19 @@ public sealed class SenseVoiceSpeechEngine : ISpeechEngine
             config.MaxActivePaths = 4;
 
             _recognizer = new OfflineRecognizer(config);
+            Log.Info(
+                "Speech model loaded " +
+                $"elapsedMs={stopwatch.ElapsedMilliseconds} modelRoot={paths.ModelRoot} threads={config.ModelConfig.NumThreads}");
             return _recognizer;
         }
-        catch (MTException)
+        catch (MTException ex)
         {
+            Log.Error(ex, "Failed to load speech model with MTException");
             throw;
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Failed to load speech model");
             throw new MTException(L10n.Tr("加载识别模型失败：", "Failed to load speech model: ") + ex.Message);
         }
         finally

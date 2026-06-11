@@ -23,12 +23,14 @@ public static class TextInserter
     {
         if (targetWindow != IntPtr.Zero && GetForegroundWindow() != targetWindow)
         {
+            Log.Info($"Insert target window is not foreground; attempting focus target=0x{targetWindow.ToInt64():X}");
             SetForegroundWindow(targetWindow);
             await Task.Delay(conservativePaste ? 750 : 250);
         }
 
         if (targetWindow != IntPtr.Zero && GetForegroundWindow() != targetWindow)
         {
+            Log.Warn($"Insert fallback to clipboard; foreground did not return to target=0x{targetWindow.ToInt64():X}");
             SetClipboardText(text);
             return InsertOutcome.ClipboardOnly;
         }
@@ -43,6 +45,7 @@ public static class TextInserter
             _ = RestoreClipboardLater(text, oldText);
         }
 
+        Log.Info($"Insert pasted chars={text.Length} restoreClipboard={allowClipboardRestore && SettingsStore.Instance.Current.RestoreClipboard}");
         return InsertOutcome.Pasted;
     }
 
@@ -66,10 +69,12 @@ public static class TextInserter
             if (oldText is null)
             {
                 Clipboard.Clear();
+                Log.Info("Clipboard restored by clearing MicType text");
             }
             else
             {
                 Clipboard.SetText(oldText);
+                Log.Info("Clipboard restored to previous text");
             }
         }, DispatcherPriority.Background);
     }

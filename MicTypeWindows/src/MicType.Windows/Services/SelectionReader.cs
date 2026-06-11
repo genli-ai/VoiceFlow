@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Automation;
+using MicType.Win.Core;
 
 namespace MicType.Win.Services;
 
@@ -17,8 +18,9 @@ public static class SelectionReader
             var text = string.Join("", ranges.Select(r => r.GetText(-1)));
             return string.IsNullOrWhiteSpace(text) ? null : text;
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error(ex, "Failed to read selected text through UI Automation");
             return null;
         }
     }

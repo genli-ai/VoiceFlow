@@ -51,8 +51,9 @@ public sealed class HistoryStore
             _items.Clear();
             _items.AddRange(items.Take(MaxCount));
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error(ex, "Failed to load history");
             _items.Clear();
         }
     }

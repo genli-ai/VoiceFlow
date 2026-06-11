@@ -79,6 +79,7 @@ public sealed class SenseVoiceModelDownloader
         {
             if (!force && IsModelAvailable)
             {
+                Log.Info("SenseVoice download skipped; model already available");
                 Refresh();
                 return;
             }
@@ -95,11 +96,13 @@ public sealed class SenseVoiceModelDownloader
 
             try
             {
+                Log.Info($"SenseVoice download started force={force} dir={ModelDirectory}");
                 Exception? lastError = null;
                 foreach (var uri in BuildArchiveUris())
                 {
                     try
                     {
+                        Log.Info("SenseVoice download source " + uri);
                         Publish(true, 0, L10n.Tr("正在下载 SenseVoice 模型…", "Downloading SenseVoice model..."));
                         await DownloadArchiveAsync(uri, archivePath, ct);
                         lastError = null;
@@ -107,6 +110,7 @@ public sealed class SenseVoiceModelDownloader
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
+                        Log.Error(ex, "SenseVoice download source failed: " + uri);
                         lastError = ex;
                     }
                 }
@@ -117,6 +121,7 @@ public sealed class SenseVoiceModelDownloader
                 }
 
                 Publish(true, null, L10n.Tr("正在解压模型…", "Extracting model..."));
+                Log.Info("SenseVoice extracting archive");
                 ExtractArchive(archivePath, stagingDir);
 
                 if (!SenseVoiceModelPaths.IsAvailable(stagingDir))
@@ -127,15 +132,18 @@ public sealed class SenseVoiceModelDownloader
 
                 Publish(true, null, L10n.Tr("正在安装模型…", "Installing model..."));
                 ReplaceModelDirectory(stagingDir, ModelDirectory);
+                Log.Info("SenseVoice model installed");
                 Publish(false, null, L10n.Tr("SenseVoice 模型已就绪", "SenseVoice model ready"));
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+                Log.Error(ex, "SenseVoice download cancelled");
                 Publish(false, null, L10n.Tr("已取消下载", "Download cancelled"));
                 throw;
             }
             catch (Exception ex)
             {
+                Log.Error(ex, "SenseVoice download failed");
                 Publish(false, null, L10n.Tr("模型下载失败：", "Model download failed: ") + ex.Message);
                 throw new MTException(L10n.Tr("模型下载失败：", "Model download failed: ") + ex.Message);
             }
@@ -235,8 +243,9 @@ public sealed class SenseVoiceModelDownloader
         {
             if (File.Exists(path)) File.Delete(path);
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error(ex, "Failed to delete temporary file: " + path);
         }
     }
 
@@ -246,8 +255,9 @@ public sealed class SenseVoiceModelDownloader
         {
             if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error(ex, "Failed to delete temporary directory: " + path);
         }
     }
 }

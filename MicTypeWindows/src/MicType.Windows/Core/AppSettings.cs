@@ -136,8 +136,9 @@ public sealed class SettingsStore
             var json = File.ReadAllText(AppPaths.SettingsPath);
             return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Error(ex, "Failed to load settings");
             return new AppSettings();
         }
     }

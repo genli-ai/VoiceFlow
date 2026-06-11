@@ -163,11 +163,13 @@ public partial class SettingsWindow : Window
         {
             await _modelDownloader.DownloadAsync(force);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+            Log.Error(ex, "Model download cancelled from settings");
         }
         catch (MTException ex)
         {
+            Log.Error(ex, "Model download failed from settings");
             AsrStatusText.Text = ex.UserMessage;
         }
     }
