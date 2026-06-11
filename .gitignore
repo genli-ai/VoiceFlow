@@ -9,3 +9,4 @@ MicType-v*.zip
 MicType-v*.dmg
 release/
 scripts/maintainer/
+.vscode/
