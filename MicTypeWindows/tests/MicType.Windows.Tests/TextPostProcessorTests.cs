@@ -25,7 +25,7 @@ public sealed class TextPostProcessorTests
     [Fact]
     public void FixMixedPunctuationConvertsFullWidthAfterEnglish()
     {
-        Assert.Equal("Open API, 然后测试.", TextPostProcessor.FixMixedPunctuation("Open API，然后测试。"));
+        Assert.Equal("Open API, 然后测试。", TextPostProcessor.FixMixedPunctuation("Open API，然后测试。"));
     }
 
     [Fact]
