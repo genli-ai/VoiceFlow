@@ -4,6 +4,8 @@ namespace MicType.Win.Core;
 
 public static partial class TextPostProcessor
 {
+    private const string LatinOrDigit = "([A-Za-z0-9\\u00C0-\\u024F])";
+
     public static string CleanTranscript(string text)
     {
         var value = BracketMarkerRegex().Replace(text, "");
@@ -23,7 +25,7 @@ public static partial class TextPostProcessor
 
         foreach (var (full, half) in pairs)
         {
-            value = Regex.Replace(value, "([\\p{L}0-9])" + Regex.Escape(full), "$1" + half);
+            value = Regex.Replace(value, LatinOrDigit + Regex.Escape(full), "$1" + half);
         }
 
         return Regex.Replace(value, "([.,!?;:])([\\p{L}\\u4e00-\\u9fff])", "$1 $2");
