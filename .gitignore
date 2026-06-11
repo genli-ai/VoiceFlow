@@ -3,12 +3,12 @@ build.log
 MicType/.build/
 MicType/dist/
 MicType/Frameworks/
-docs/
+/docs/
 MicType/.xcbuild/
 MicType-v*.zip
 MicType-v*.dmg
-release/
-scripts/maintainer/
+/release/
+/scripts/maintainer/
 .vscode/
 # Windows port build artifacts
 MicTypeWindows/**/bin/
