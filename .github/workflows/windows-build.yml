@@ -2,7 +2,7 @@ name: Windows Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, "windows*"]
     paths:
       - "MicTypeWindows/**"
       - ".github/workflows/windows-build.yml"
