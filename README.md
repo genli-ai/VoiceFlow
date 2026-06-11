@@ -41,7 +41,7 @@ Tap is always pure dictation (what you say is what gets typed), hold is always a
 
 Requirements: **Apple Silicon + macOS 15+**. (Building from source additionally needs full Xcode — MLX compiles Metal shaders.)
 
-**Prebuilt (recommended):** download the latest package from [GitHub Releases](https://github.com/genli-ai/MicType/releases/latest), unzip, drag `MicType.app` to Applications.
+**Prebuilt (recommended):** download the latest package from [GitHub Releases](https://github.com/genli-ai/MicType/releases/latest), unzip, and drag `MicType.app` to Applications. **First launch:** if macOS blocks the app ("Apple could not verify…"), open System Settings → Privacy & Security and click **Open Anyway**. A notarized DMG that opens with no warnings is on its way to Releases.
 
 **From source, three steps:**
 
@@ -86,7 +86,7 @@ Two kinds of vocabulary, not to confuse:
 
 ## FAQ
 
-**Hotkey does not respond?** Check System Settings → Privacy & Security → Accessibility. After rebuilding or reinstalling, macOS usually requires removing the old permission entry and adding the app again.
+**Hotkey does not respond?** Check System Settings → Privacy & Security → Accessibility. If you build from source (ad-hoc signing), macOS usually requires removing the old permission entry and adding the app again after each rebuild; official notarized releases keep a stable identity, so upgrades don't need this.
 
 **Custom names or terms are wrong?** Add names, brands, products, and technical terms to Settings → Recognition → Custom Vocabulary. They are used both as Qwen hotwords and as hints for AI polish.
 
@@ -180,7 +180,7 @@ This project was designed, implemented, debugged, and refined with AI collaborat
 
 要求：**Apple Silicon + macOS 15+**（从源码编译另需完整 Xcode——MLX 要编译 Metal 着色器）。
 
-**预编译包（推荐）**：从 [GitHub Releases](https://github.com/genli-ai/MicType/releases/latest) 下载最新包，解压后把 `MicType.app` 拖进应用程序。
+**预编译包（推荐）**：从 [GitHub Releases](https://github.com/genli-ai/MicType/releases/latest) 下载最新包，解压后把 `MicType.app` 拖进应用程序。**首次打开**：若 macOS 提示"无法验证开发者"，到 系统设置 → 隐私与安全性 → 点「仍要打开」。已通过 Apple 公证、打开零拦截的 DMG 稍后会附到 Releases。
 
 **源码安装三步**：
 
@@ -225,7 +225,7 @@ This project was designed, implemented, debugged, and refined with AI collaborat
 
 ## 常见问题
 
-**按快捷键没反应？** 检查 系统设置 → 隐私与安全性 → 辅助功能。重新编译或覆盖安装后，通常需要删除旧授权条目再重新添加。
+**按快捷键没反应？** 检查 系统设置 → 隐私与安全性 → 辅助功能。从源码自行编译（ad-hoc 签名）每次重装后通常需要删除旧授权条目再重新添加；官方公证版签名身份稳定，升级不需要这一步。
 
 **识别专有名词不准？** 把常用人名、品牌、产品、术语写进 设置 → 识别 → 专有词汇表。它同时参与 Qwen 热词提示和 AI 润色纠错。
 
