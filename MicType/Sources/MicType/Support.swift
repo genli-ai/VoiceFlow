@@ -4,7 +4,7 @@ import ApplicationServices
 
 // MARK: - 错误类型
 
-struct VFError: Error {
+struct MTError: Error {
     let message: String
     init(_ message: String) { self.message = message }
 }
@@ -14,7 +14,13 @@ struct VFError: Error {
 enum Paths {
     static var appSupportDir: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = base.appendingPathComponent("VoiceFlow", isDirectory: true)
+        let dir = base.appendingPathComponent("MicType", isDirectory: true)
+        // 改名迁移：把旧的 VoiceFlow 数据目录（含约 860MB 识别模型）原地改名，免重新下载
+        let legacy = base.appendingPathComponent("VoiceFlow", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: dir.path),
+           FileManager.default.fileExists(atPath: legacy.path) {
+            try? FileManager.default.moveItem(at: legacy, to: dir)
+        }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }

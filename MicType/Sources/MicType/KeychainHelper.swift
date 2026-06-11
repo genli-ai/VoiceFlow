@@ -3,7 +3,9 @@ import Security
 
 /// 把 OpenAI API Key 存在系统钥匙串里（不落明文文件）
 enum KeychainHelper {
-    private static let service = "com.ligen.voiceflow"
+    private static let service = "com.ligen.mictype"
+    /// 改名前（VoiceFlow 时代）的钥匙串条目，首次读取时自动迁移到新条目
+    private static let legacyService = "com.ligen.voiceflow"
 
     /// 不传 account 时默认操作"当前选中的服务商"的 Key
     static func saveAPIKey(_ value: String, account: String? = nil) {
@@ -31,9 +33,26 @@ enum KeychainHelper {
         ]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
-        let key = String(data: data, encoding: .utf8)
-        return (key?.isEmpty == false) ? key : nil
+        if status == errSecSuccess, let data = result as? Data,
+           let key = String(data: data, encoding: .utf8), !key.isEmpty {
+            return key
+        }
+        // 新条目没有 → 尝试从旧 VoiceFlow 条目读取并自动迁移
+        let legacyQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: legacyService,
+            kSecAttrAccount as String: acct,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var legacyResult: AnyObject?
+        if SecItemCopyMatching(legacyQuery as CFDictionary, &legacyResult) == errSecSuccess,
+           let data = legacyResult as? Data,
+           let key = String(data: data, encoding: .utf8), !key.isEmpty {
+            saveAPIKey(key, account: acct)   // 存入新条目，下次直接命中
+            return key
+        }
+        return nil
     }
 
     static func deleteAPIKey(account: String? = nil) {

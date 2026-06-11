@@ -110,8 +110,8 @@ final class DictationController {
         guard Permissions.isAccessibilityTrusted else {
             didPromptAccessibility = true
             Permissions.promptAccessibility()
-            overlay.flashError(tr("请先开启辅助功能权限，然后重启 VoiceFlow",
-                                  "Enable Accessibility permission, then restart VoiceFlow"))
+            overlay.flashError(tr("请先开启辅助功能权限，然后重启 MicType",
+                                  "Enable Accessibility permission, then restart MicType"))
             Sounds.playError()
             return
         }
@@ -157,7 +157,7 @@ final class DictationController {
             do {
                 try self.recorder.start()
             } catch {
-                let message = (error as? VFError)?.message ?? error.localizedDescription
+                let message = (error as? MTError)?.message ?? error.localizedDescription
                 self.overlay.flashError(message)
                 Sounds.playError()
                 return

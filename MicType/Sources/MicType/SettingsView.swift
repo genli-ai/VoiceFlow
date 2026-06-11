@@ -19,7 +19,7 @@ final class SettingsWindowController {
             w.center()
             window = w
         }
-        window?.title = tr("VoiceFlow 设置", "VoiceFlow Settings")
+        window?.title = tr("MicType 设置", "MicType Settings")
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
@@ -121,8 +121,8 @@ private struct GeneralTab: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 if !axOK {
-                    Text(tr("如果系统设置里显示已开启但这里仍是 ✗：是旧版授权失效了。请在 辅助功能 列表中选中 VoiceFlow，点「−」删除，再点「+」重新添加。",
-                            "If System Settings shows it enabled but this still shows ✗, the old grant is stale: remove VoiceFlow from the Accessibility list (−), then add it back (+)."))
+                    Text(tr("如果系统设置里显示已开启但这里仍是 ✗：是旧版授权失效了。请在 辅助功能 列表中选中 MicType，点「−」删除，再点「+」重新添加。",
+                            "If System Settings shows it enabled but this still shows ✗, the old grant is stale: remove MicType from the Accessibility list (−), then add it back (+)."))
                         .font(.caption)
                         .foregroundColor(.orange)
                 }
@@ -416,10 +416,10 @@ private struct AboutTab: View {
             Image(systemName: "waveform.circle.fill")
                 .font(.system(size: 56))
                 .foregroundColor(.accentColor)
-            Text("VoiceFlow")
+            Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.0.0 · Qwen3-ASR 引擎 + 语音技能",
-                    "Version 3.0.0 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.1.0 · Qwen3-ASR 引擎 + 语音技能",
+                    "Version 3.1.0 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))

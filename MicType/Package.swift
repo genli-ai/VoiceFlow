@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "VoiceFlow",
+    name: "MicType",
     platforms: [
         // Qwen3-ASR(MLX) 引擎要求 macOS 15+、Apple Silicon
         .macOS("15.0")
@@ -14,11 +14,11 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "VoiceFlow",
+            name: "MicType",
             dependencies: [
                 .product(name: "MLXASR", package: "mlx-swift-asr"),
             ],
-            path: "Sources/VoiceFlow",
+            path: "Sources/MicType",
             swiftSettings: [
                 // 源码按 Swift 5 语言模式编译（避免 Swift 6 严格并发检查）
                 .swiftLanguageMode(.v5)

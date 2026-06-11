@@ -90,18 +90,18 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
 
     /// HF 上的 Qwen3-ASR 量化仓库普遍缺 tokenizer.json（swift-transformers 必需），
     /// 从 App 自带资源里补一份到模型目录
-    private func ensureTokenizerFile() -> VFError? {
+    private func ensureTokenizerFile() -> MTError? {
         let dest = modelDirectory.appendingPathComponent("tokenizer.json")
         if FileManager.default.fileExists(atPath: dest.path) { return nil }
         guard let bundled = Bundle.main.url(forResource: "tokenizer", withExtension: "json",
                                             subdirectory: "QwenTokenizer") else {
-            return VFError(tr("缺少分词器资源。请先运行 scripts/Generate Qwen Tokenizer.command 再重新安装", "Tokenizer resource missing — run scripts/Generate Qwen Tokenizer.command and reinstall"))
+            return MTError(tr("缺少分词器资源。请先运行 scripts/Generate Qwen Tokenizer.command 再重新安装", "Tokenizer resource missing — run scripts/Generate Qwen Tokenizer.command and reinstall"))
         }
         do {
             try FileManager.default.copyItem(at: bundled, to: dest)
             return nil
         } catch {
-            return VFError(tr("无法写入 tokenizer.json：", "Cannot write tokenizer.json: ") + error.localizedDescription)
+            return MTError(tr("无法写入 tokenizer.json：", "Cannot write tokenizer.json: ") + error.localizedDescription)
         }
     }
 
@@ -117,10 +117,10 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
         Qwen3ASRSTT.flushMemoryPool()
     }
 
-    func transcribe(samples: [Float], completion: @escaping (Result<String, VFError>) -> Void) {
+    func transcribe(samples: [Float], completion: @escaping (Result<String, MTError>) -> Void) {
         guard isModelAvailable else {
             DispatchQueue.main.async {
-                completion(.failure(VFError(tr("Qwen 模型未下载，请在 设置 → 识别 中下载", "Qwen model not downloaded — see Settings → Recognition"))))
+                completion(.failure(MTError(tr("Qwen 模型未下载，请在 设置 → 识别 中下载", "Qwen model not downloaded — see Settings → Recognition"))))
             }
             return
         }
@@ -150,7 +150,7 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
                     self?.loadTask = nil
                     self?.loadedDirPath = nil
                     self?.readyDirPath = nil
-                    completion(.failure(VFError(tr("Qwen 模型加载失败：", "Qwen model failed to load: ") + String(message.prefix(120)))))
+                    completion(.failure(MTError(tr("Qwen 模型加载失败：", "Qwen model failed to load: ") + String(message.prefix(120)))))
                 }
                 return
             }
@@ -171,7 +171,7 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
             } catch {
                 let message = error.localizedDescription
                 DispatchQueue.main.async {
-                    completion(.failure(VFError(tr("Qwen 识别失败：", "Qwen transcription failed: ") + String(message.prefix(120)))))
+                    completion(.failure(MTError(tr("Qwen 识别失败：", "Qwen transcription failed: ") + String(message.prefix(120)))))
                 }
             }
         }
@@ -190,9 +190,9 @@ final class QwenEngine: SpeechEngine {
     var isModelLoaded: Bool { false }
     func preload() {}
     func unloadModel() {}
-    func transcribe(samples: [Float], completion: @escaping (Result<String, VFError>) -> Void) {
+    func transcribe(samples: [Float], completion: @escaping (Result<String, MTError>) -> Void) {
         DispatchQueue.main.async {
-            completion(.failure(VFError(tr("VoiceFlow 仅支持 Apple Silicon", "VoiceFlow requires Apple Silicon"))))
+            completion(.failure(MTError(tr("MicType 仅支持 Apple Silicon", "MicType requires Apple Silicon"))))
         }
     }
 }

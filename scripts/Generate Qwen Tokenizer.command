@@ -8,7 +8,7 @@ case "$SYS_LANG" in *zh*) ZH=1 ;; *) ZH=0 ;; esac
 t() { if [ "$ZH" = "1" ]; then printf "%s" "$1"; else printf "%s" "$2"; fi; }
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-OUT_DIR="$REPO_DIR/VoiceFlow/Resources/QwenTokenizer"
+OUT_DIR="$REPO_DIR/MicType/Resources/QwenTokenizer"
 WORK=$(mktemp -d)
 cd "$WORK" || exit 1
 

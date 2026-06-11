@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# VoiceFlow installer — build from source and install
-# VoiceFlow 安装脚本——从源码编译并安装
+# MicType installer — build from source and install
+# MicType 安装脚本——从源码编译并安装
 # Requires: macOS 15+, Apple Silicon, full Xcode
 #
 set -u
 
-cd "$(dirname "$0")/VoiceFlow" || { echo "VoiceFlow directory not found / 找不到 VoiceFlow 目录"; exit 1; }
+cd "$(dirname "$0")/MicType" || { echo "MicType directory not found / 找不到 MicType 目录"; exit 1; }
 
 # 双语输出：跟随系统语言
 SYS_LANG=$(defaults read -g AppleLanguages 2>/dev/null | sed -n '2p')
@@ -32,7 +32,7 @@ fail() {
 
 echo
 bold "╔══════════════════════════════════════════╗"
-bold "║   VoiceFlow $(t "安装" "Installer")                          ║"
+bold "║   MicType $(t "安装" "Installer")                          ║"
 bold "╚══════════════════════════════════════════╝"
 
 
@@ -59,9 +59,9 @@ fi
 green "  ✓ $(t "构建环境就绪" "Build environment ready")"
 
 # ── 2. Build ───────────────────────────────────────
-step "2/4 $(t "编译 VoiceFlow（首次 5-15 分钟）" "Building VoiceFlow (first build takes 5-15 min)")"
+step "2/4 $(t "编译 MicType（首次 5-15 分钟）" "Building MicType (first build takes 5-15 min)")"
 DERIVED=".xcbuild"
-if xcodebuild -scheme VoiceFlow \
+if xcodebuild -scheme MicType \
     -configuration Release \
     -destination 'platform=macOS,arch=arm64' \
     -derivedDataPath "$DERIVED" \
@@ -69,17 +69,17 @@ if xcodebuild -scheme VoiceFlow \
     :
 fi
 PRODUCTS="$DERIVED/Build/Products/Release"
-BIN="$PRODUCTS/VoiceFlow"
-[ -f "$BIN" ] || fail "$(t "编译失败。请把 VoiceFlow/build.log 最后 50 行发给开发助手。" "Build failed. Send the last 50 lines of VoiceFlow/build.log to your dev assistant.")"
+BIN="$PRODUCTS/MicType"
+[ -f "$BIN" ] || fail "$(t "编译失败。请把 MicType/build.log 最后 50 行发给开发助手。" "Build failed. Send the last 50 lines of MicType/build.log to your dev assistant.")"
 green "  ✓ $(t "编译成功" "Build succeeded")"
 
 # ── 3. Package ─────────────────────────────────────
 step "3/4 $(t "打包应用" "Packaging the app")"
 STAGE=$(mktemp -d)
-APP="$STAGE/VoiceFlow.app"
+APP="$STAGE/MicType.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-cp "$BIN" "$APP/Contents/MacOS/VoiceFlow"
+cp "$BIN" "$APP/Contents/MacOS/MicType"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 
 # MLX/tokenizer resource bundles (incl. Metal shaders) must ship with the app
@@ -110,25 +110,25 @@ green "  ✓ $(t "打包完成" "Packaging complete")"
 
 # ── 4. Install ─────────────────────────────────────
 step "4/4 $(t "安装到 /Applications" "Installing to /Applications")"
-pkill -x VoiceFlow 2>/dev/null || true
+pkill -x MicType 2>/dev/null || true
 sleep 0.5
-DEST="/Applications/VoiceFlow.app"
+DEST="/Applications/MicType.app"
 rm -rf "$DEST" 2>/dev/null
 if ! ditto "$APP" "$DEST" 2>/dev/null; then
-    DEST="$HOME/Applications/VoiceFlow.app"
+    DEST="$HOME/Applications/MicType.app"
     mkdir -p "$HOME/Applications"
     rm -rf "$DEST"
     ditto "$APP" "$DEST" || fail "$(t "无法复制到应用程序文件夹" "Could not copy to the Applications folder")"
 fi
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
 touch "$DEST" 2>/dev/null || true
-tccutil reset Accessibility com.ligen.voiceflow >/dev/null 2>&1 || true
+tccutil reset Accessibility com.ligen.mictype >/dev/null 2>&1 || true
 green "  ✓ $(t "已安装：" "Installed: ")$DEST"
 
 open "$DEST"
 
 echo
-bold "🎉 $(t "VoiceFlow 安装完成！接下来：" "VoiceFlow installed! Next steps:")"
+bold "🎉 $(t "MicType 安装完成！接下来：" "MicType installed! Next steps:")"
 echo
 echo "  1. $(t "重新授权【辅助功能】：系统设置 → 隐私与安全性 → 辅助功能（已有条目先删再加）" "Re-grant Accessibility: System Settings → Privacy & Security → Accessibility (remove the old entry, then add again)")"
 echo "  2. $(t "首次使用：设置 → 识别 → 下载模型（约 860MB，一次性）" "First run: Settings → Recognition → Download Model (~860 MB, one-time)")"

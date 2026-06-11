@@ -150,6 +150,20 @@ final class Settings {
             SettingsKeys.deepseekModel: LLMProvider.deepseek.defaultModel,
         ])
 
+        // 一次性迁移：产品由 VoiceFlow 改名 MicType，defaults 域随 Bundle ID 变更，
+        // 把旧域里用户设置过的值（词汇表、档位、Base URL 等）原样搬过来。
+        if !d.bool(forKey: "migratedFromVoiceFlow") {
+            let legacyPlist = NSHomeDirectory() + "/Library/Preferences/com.ligen.voiceflow.plist"
+            if let legacy = NSDictionary(contentsOfFile: legacyPlist) as? [String: Any] {
+                let bundleID = Bundle.main.bundleIdentifier ?? "com.ligen.mictype"
+                let alreadySet = d.persistentDomain(forName: bundleID) ?? [:]
+                for (key, value) in legacy where alreadySet[key] == nil {
+                    d.set(value, forKey: key)
+                }
+            }
+            d.set(true, forKey: "migratedFromVoiceFlow")
+        }
+
         // 一次性迁移：统一默认模型为 gpt-5.4-mini（质量与速度的平衡点）
         if !d.bool(forKey: "migratedModelToMini2") {
             let current = d.string(forKey: SettingsKeys.chatModel)

@@ -5,23 +5,23 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleExecutable</key>
-    <string>VoiceFlow</string>
+    <string>MicType</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.ligen.voiceflow</string>
+    <string>com.ligen.mictype</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>VoiceFlow</string>
+    <string>MicType</string>
     <key>CFBundleDisplayName</key>
-    <string>VoiceFlow</string>
+    <string>MicType</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>3.0.0</string>
+    <string>3.1.0</string>
     <key>CFBundleVersion</key>
-    <string>6</string>
+    <string>7</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
     <key>LSUIElement</key>
@@ -29,7 +29,7 @@
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>VoiceFlow 需要使用麦克风把你的语音转换成文字。语音识别完全在本机进行，录音不会上传。</string>
+    <string>MicType 需要使用麦克风把你的语音转换成文字。语音识别完全在本机进行，录音不会上传。</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

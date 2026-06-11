@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let button = statusItem.button else { return }
         switch phase {
         case .idle:
-            button.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "VoiceFlow")
+            button.image = NSImage(systemSymbolName: "mic", accessibilityDescription: "MicType")
             button.contentTintColor = nil
         case .recording:
             button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: tr("录音中", "Recording"))
@@ -141,7 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let quitItem = makeItem(tr("退出 VoiceFlow", "Quit VoiceFlow"), #selector(quit))
+        let quitItem = makeItem(tr("退出 MicType", "Quit MicType"), #selector(quit))
         quitItem.keyEquivalent = "q"
         quitItem.keyEquivalentModifierMask = .command
         menu.addItem(quitItem)

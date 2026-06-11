@@ -1,11 +1,11 @@
 .DS_Store
 build.log
-VoiceFlow/.build/
-VoiceFlow/dist/
-VoiceFlow/Frameworks/
+MicType/.build/
+MicType/dist/
+MicType/Frameworks/
 docs/
-VoiceFlow/.xcbuild/
-VoiceFlow-v*.zip
-VoiceFlow-v*.dmg
+MicType/.xcbuild/
+MicType-v*.zip
+MicType-v*.dmg
 release/
 scripts/maintainer/

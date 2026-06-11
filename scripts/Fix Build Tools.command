@@ -22,6 +22,6 @@ echo
 xcode-select --install 2>/dev/null || true
 echo "已请求安装。请在弹出的窗口中点「安装」并等待完成。"
 echo
-echo "★ 安装完成后，重新双击「Install VoiceFlow V2.command」即可。"
+echo "★ 安装完成后，重新双击「Install MicType V2.command」即可。"
 echo
 echo "按任意键关闭本窗口…"; read -n 1 -s || true

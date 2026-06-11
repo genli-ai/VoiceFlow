@@ -10,5 +10,5 @@ protocol SpeechEngine: AnyObject {
     func preload()
     func unloadModel()
     /// samples：16kHz 单声道 Float32。completion 在主线程回调。
-    func transcribe(samples: [Float], completion: @escaping (Result<String, VFError>) -> Void)
+    func transcribe(samples: [Float], completion: @escaping (Result<String, MTError>) -> Void)
 }
