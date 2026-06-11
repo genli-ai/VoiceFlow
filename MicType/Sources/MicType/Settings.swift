@@ -95,7 +95,10 @@ enum SettingsKeys {
     static let polishEnabled = "polishEnabled"
     static let polishLevel = "polishLevel"
     static let openaiBaseURL = "openaiBaseURL"
-    static let chatModel = "chatModel"
+    static let chatModel = "chatModel"                     // OpenAI 润色模型（快）
+    static let openaiCommandModel = "openaiCommandModel"   // OpenAI 指令模型（强）
+    static let deepseekCommandModel = "deepseekCommandModel"
+    static let aboutMe = "aboutMe"
     static let customPolishRules = "customPolishRules"
     static let customVocabulary = "customVocabulary"
     static let playSounds = "playSounds"
@@ -120,7 +123,10 @@ final class Settings {
             SettingsKeys.polishEnabled: true,
             SettingsKeys.polishLevel: PolishLevel.smart.rawValue,
             SettingsKeys.openaiBaseURL: "https://api.openai.com/v1",
-            SettingsKeys.chatModel: "gpt-5.4-mini",
+            SettingsKeys.chatModel: "gpt-5.4-nano",
+            SettingsKeys.openaiCommandModel: "gpt-5.4-mini",
+            SettingsKeys.deepseekCommandModel: LLMProvider.deepseek.defaultModel,
+            SettingsKeys.aboutMe: "",
             SettingsKeys.customPolishRules: "",
             SettingsKeys.customVocabulary: "",
             SettingsKeys.playSounds: true,
@@ -153,6 +159,18 @@ final class Settings {
                 d.set("gpt-5.4-mini", forKey: SettingsKeys.chatModel)
             }
             d.set(true, forKey: "migratedModelToMini2")
+        }
+
+        // 一次性迁移（3.2.1）：润色/指令模型分离——指令继承旧的通用模型，润色降为 nano（速度优先）
+        if !d.bool(forKey: "migratedSplitModels") {
+            if let old = d.string(forKey: SettingsKeys.chatModel) {
+                d.set(old, forKey: SettingsKeys.openaiCommandModel)
+            }
+            d.set("gpt-5.4-nano", forKey: SettingsKeys.chatModel)
+            if let oldDS = d.string(forKey: SettingsKeys.deepseekModel) {
+                d.set(oldDS, forKey: SettingsKeys.deepseekCommandModel)
+            }
+            d.set(true, forKey: "migratedSplitModels")
         }
     }
 
@@ -226,17 +244,39 @@ final class Settings {
         set { d.set(newValue, forKey: SettingsKeys.deepseekModel) }
     }
 
-    /// 当前服务商生效的 Base URL / 模型名
+    var openaiCommandModel: String {
+        get { d.string(forKey: SettingsKeys.openaiCommandModel) ?? "gpt-5.4-mini" }
+        set { d.set(newValue, forKey: SettingsKeys.openaiCommandModel) }
+    }
+
+    var deepseekCommandModel: String {
+        get { d.string(forKey: SettingsKeys.deepseekCommandModel) ?? LLMProvider.deepseek.defaultModel }
+        set { d.set(newValue, forKey: SettingsKeys.deepseekCommandModel) }
+    }
+
+    /// 「关于我」：署名、惯用语气等，注入语音指令 prompt
+    var aboutMe: String {
+        get { d.string(forKey: SettingsKeys.aboutMe) ?? "" }
+        set { d.set(newValue, forKey: SettingsKeys.aboutMe) }
+    }
+
+    /// 当前服务商生效的 Base URL / 润色模型（快）/ 指令模型（强）
     var currentBaseURL: String {
         switch llmProvider {
         case .openai: return openaiBaseURL
         case .deepseek: return deepseekBaseURL
         }
     }
-    var currentChatModel: String {
+    var currentPolishModel: String {
         switch llmProvider {
         case .openai: return chatModel
         case .deepseek: return deepseekModel
+        }
+    }
+    var currentCommandModel: String {
+        switch llmProvider {
+        case .openai: return openaiCommandModel
+        case .deepseek: return deepseekCommandModel
         }
     }
 

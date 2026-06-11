@@ -257,9 +257,12 @@ private struct PolishTab: View {
     @AppStorage(SettingsKeys.skillsEnabled) private var skillsEnabled = true
     @AppStorage(SettingsKeys.llmProvider) private var provider = LLMProvider.openai.rawValue
     @AppStorage(SettingsKeys.openaiBaseURL) private var baseURL = "https://api.openai.com/v1"
-    @AppStorage(SettingsKeys.chatModel) private var chatModel = "gpt-5.4-mini"
+    @AppStorage(SettingsKeys.chatModel) private var chatModel = "gpt-5.4-nano"
+    @AppStorage(SettingsKeys.openaiCommandModel) private var openaiCommandModel = "gpt-5.4-mini"
     @AppStorage(SettingsKeys.deepseekBaseURL) private var dsBaseURL = LLMProvider.deepseek.defaultBaseURL
     @AppStorage(SettingsKeys.deepseekModel) private var dsModel = LLMProvider.deepseek.defaultModel
+    @AppStorage(SettingsKeys.deepseekCommandModel) private var dsCommandModel = LLMProvider.deepseek.defaultModel
+    @AppStorage(SettingsKeys.aboutMe) private var aboutMe = ""
     @State private var apiKey = KeychainHelper.loadAPIKey() ?? ""
     @State private var openaiSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.openai.keychainAccount) != nil)
     @State private var dsSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.deepseek.keychainAccount) != nil)
@@ -348,19 +351,23 @@ private struct PolishTab: View {
                 if provider == LLMProvider.deepseek.rawValue {
                     TextField(tr("Base URL", "Base URL"), text: $dsBaseURL)
                         .textFieldStyle(.roundedBorder)
-                    TextField(tr("模型名（如 deepseek-v4-flash）", "Model (e.g. deepseek-v4-flash)"), text: $dsModel)
+                    TextField(tr("润色模型（求快，如 deepseek-v4-flash）", "Polish model (fast, e.g. deepseek-v4-flash)"), text: $dsModel)
                         .textFieldStyle(.roundedBorder)
-                    Text(tr("可选模型：deepseek-v4-flash（推荐，快且便宜）、deepseek-v4-pro（更强但更贵）。若响应偏慢，可改填 deepseek-chat（= flash 的非思考模式别名）。Key 在 platform.deepseek.com 申请。",
-                            "Models: deepseek-v4-flash (recommended — fast and cheap) or deepseek-v4-pro (stronger, pricier). If responses feel slow, use deepseek-chat (alias of flash without thinking mode). Get a key at platform.deepseek.com."))
+                    TextField(tr("指令模型（求好，如 deepseek-v4-pro）", "Command model (strong, e.g. deepseek-v4-pro)"), text: $dsCommandModel)
+                        .textFieldStyle(.roundedBorder)
+                    Text(tr("润色高频求快、指令低频求好，两个模型分开配。flash 快且便宜，pro 更强；响应慢可改 deepseek-chat（flash 非思考别名）。Key 在 platform.deepseek.com 申请。",
+                            "Polish runs often and wants speed; commands run rarely and want quality — configure them separately. flash is fast & cheap, pro is stronger; use deepseek-chat if responses feel slow. Get a key at platform.deepseek.com."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
                     TextField(tr("Base URL", "Base URL"), text: $baseURL)
                         .textFieldStyle(.roundedBorder)
-                    TextField(tr("模型名（如 gpt-5.4-mini）", "Model (e.g. gpt-5.4-mini)"), text: $chatModel)
+                    TextField(tr("润色模型（求快，如 gpt-5.4-nano）", "Polish model (fast, e.g. gpt-5.4-nano)"), text: $chatModel)
                         .textFieldStyle(.roundedBorder)
-                    Text(tr("默认 https://api.openai.com/v1 + gpt-5.4-mini（均衡）。极致速度换 gpt-5.4-nano，深度质量换 gpt-5.5；也可填任何 OpenAI 兼容中转。",
-                            "Defaults: https://api.openai.com/v1 + gpt-5.4-mini (balanced). Use gpt-5.4-nano for speed, gpt-5.5 for quality; any OpenAI-compatible endpoint works."))
+                    TextField(tr("指令模型（求好，如 gpt-5.4-mini / gpt-5.5）", "Command model (strong, e.g. gpt-5.4-mini / gpt-5.5)"), text: $openaiCommandModel)
+                        .textFieldStyle(.roundedBorder)
+                    Text(tr("润色高频求快（默认 nano），指令低频求好（默认 mini，想要 ChatGPT 旗舰级就填 gpt-5.5）。也可填任何 OpenAI 兼容服务（如高速推理商）。",
+                            "Polish runs often and wants speed (default nano); commands run rarely and want quality (default mini — use gpt-5.5 for flagship-level writing). Any OpenAI-compatible endpoint works, including fast-inference providers."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -368,7 +375,21 @@ private struct PolishTab: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("自定义润色规则（可选）：", "Custom polish rules (optional):"))
+                    Text(tr("关于我（可选）：", "About me (optional):"))
+                    TextEditor(text: $aboutMe)
+                        .font(.system(size: 12))
+                        .frame(height: 50)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.gray.opacity(0.3)))
+                    Text(tr("例如：「署名用 Gen」「邮件偏正式、聊天随意」「MBA 学生，常写商务邮件」。语音指令草拟邮件/回复时会代入这些信息。",
+                            "E.g. \"sign as Gen\", \"formal in email, casual in chat\". Voice commands use this when drafting emails and replies."))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("自定义规则（可选，润色和指令都生效）：", "Custom rules (optional — applies to polish and commands):"))
                     TextEditor(text: $customRules)
                         .font(.system(size: 12))
                         .frame(height: 70)
@@ -421,8 +442,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.2.0 · Qwen3-ASR 引擎 + 语音技能",
-                    "Version 3.2.0 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.2.1 · Qwen3-ASR 引擎 + 语音技能",
+                    "Version 3.2.1 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))

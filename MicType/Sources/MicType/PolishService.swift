@@ -21,6 +21,7 @@ enum PolishService {
         LLMClient.chat(messages: messages,
                        temperature: 0.25,
                        timeout: 20,
+                       model: Settings.shared.currentPolishModel,
                        completion: completion)
     }
 

@@ -117,6 +117,8 @@ final class DictationController {
                     self.targetSelection = text
                 }
             }
+            // 用户说话期间把到 API 的 DNS+TLS 握手做完，润色/指令请求省下首包延迟
+            LLMClient.prewarm()
             self.recorder.onLevel = { [weak self] level in
                 DispatchQueue.main.async {
                     self?.overlay.state.pushLevel(level)
@@ -151,12 +153,10 @@ final class DictationController {
 
         phase = .processing
         overlay.showProcessing(tr("识别中…", "Transcribing…"))
-        let tStart = Date()
         let isColdStart = !QwenEngine.shared.isModelReady
 
         QwenEngine.shared.transcribe(samples: samples) { [weak self] result in
             guard let self = self else { return }
-            let asrSeconds = Date().timeIntervalSince(tStart)
             switch result {
             case .failure(let error):
                 self.phase = .idle
@@ -177,15 +177,11 @@ final class DictationController {
                 let level = Settings.shared.polishLevel
                 if level != .off, KeychainHelper.loadAPIKey() != nil {
                     self.overlay.showProcessing(tr("润色中…", "Polishing…"))
-                    let tPolish = Date()
                     PolishService.polish(rawText, level: level) { [weak self] polished, failure in
                         guard let self = self else { return }
-                        let polishSeconds = Date().timeIntervalSince(tPolish)
-                        let timing = String(format: tr("识别 %.1fs · 润色 %.1fs", "ASR %.1fs · polish %.1fs"),
-                                            asrSeconds, polishSeconds)
                         if let polished = polished {
                             self.deliver(raw: rawText, final: polished,
-                                         note: tr("已输入（", "Inserted (") + timing + tr("）", ")"),
+                                         note: tr("已输入", "Inserted"),
                                          allowClipboardRestore: !isColdStart)
                         } else {
                             self.deliver(raw: rawText, final: rawText,
@@ -197,9 +193,8 @@ final class DictationController {
                         }
                     }
                 } else {
-                    let timing = String(format: tr("识别 %.1fs", "ASR %.1fs"), asrSeconds)
                     self.deliver(raw: rawText, final: rawText,
-                                 note: tr("已输入（", "Inserted (") + timing + tr("）", ")"),
+                                 note: tr("已输入", "Inserted"),
                                  allowClipboardRestore: !isColdStart)
                 }
             }

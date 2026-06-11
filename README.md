@@ -2,6 +2,9 @@
 
 **Voice input for macOS that doubles as your AI entry point.** One key, two gestures: **tap** the hotkey and your speech becomes clean, punctuated text at the cursor — recognized 100% on-device. **Hold** the same key and your voice becomes an instruction to AI: rewrite the selection, draft a reply, compose an email, translate, ask anything — right where you're working, in any app.
 
+> **⬇️ Just want to use the app? [Download it from Releases](https://github.com/genli-ai/MicType/releases/latest) — no Xcode, no build step.**
+> The green "Code" button downloads the *source code*; building from source is for developers and requires full Xcode.
+
 **中文说明在下方。**
 
 ## Two Gestures
@@ -142,6 +145,9 @@ This project was designed, implemented, debugged, and refined with AI collaborat
 # MicType 🎤 — 轻点听写，按住说指令
 
 **Mac 语音输入法，也是你的 AI 入口。** 一个键，两种手势：**轻点**快捷键，说话变成干净、带标点的文字出现在光标处——识别 100% 在本机完成；**按住**同一个键，说出的话就是给 AI 的指令——改写选中文字、草拟回复、写邮件、翻译、随口提问，在任何应用里、就在你正在打字的地方。
+
+> **⬇️ 只是想用？[去 Releases 下载现成的 App](https://github.com/genli-ai/MicType/releases/latest)——不需要 Xcode、不需要编译。**
+> 绿色 "Code" 按钮下载的是*源代码*；从源码安装只面向开发者，需要完整 Xcode。
 
 ## 两种手势
 
