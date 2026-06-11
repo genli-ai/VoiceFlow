@@ -10,13 +10,15 @@ This folder is the Windows implementation scaffold for MicType. It is intentiona
 - Clipboard + Ctrl+V insertion with clipboard restore
 - UI Automation selected-text read with Ctrl+C fallback
 - OpenAI-compatible LLM client, polish prompt, command prompts, reply trigger routing
+- Local ASR via sherpa-onnx + SenseVoice
 - JSON settings in `%APPDATA%\MicType\settings.json`
+- SenseVoice model files in `%APPDATA%\MicType\models\sensevoice`
 - Credential Manager API key storage:
   - `MicType/openai_api_key`
   - `MicType/deepseek_api_key`
 - History in `%APPDATA%\MicType\history.json`
 
-The local ASR engine is still a placeholder. Per the technical plan, M0 must be completed on a real Windows 11 machine before wiring sherpa-onnx / whisper.cpp / any Qwen3-ASR Windows runtime.
+The first run needs the SenseVoice model. Open Settings → Recognition and download the model before using dictation. MicType records 16 kHz mono audio locally, sends it to the local SenseVoice recognizer, then optionally sends text only to your configured GPT / DeepSeek API for polishing or commands.
 
 ## Build
 
@@ -28,19 +30,29 @@ dotnet build .\src\MicType.Windows\MicType.Windows.csproj -c Debug
 dotnet run --project .\src\MicType.Windows\MicType.Windows.csproj
 ```
 
+Run unit tests:
+
+```powershell
+dotnet test .\tests\MicTypeWindows.Tests.sln -c Debug
+```
+
+Run the real SenseVoice integration test. This downloads the official k2-fsa SenseVoice archive if the model cache is empty:
+
+```powershell
+$env:MICTYPE_RUN_SENSEVOICE_INTEGRATION = "1"
+$env:MICTYPE_SENSEVOICE_MODEL_DIR = "$PWD\.model-cache\sensevoice"
+dotnet test .\tests\MicTypeWindows.Tests.sln -c Debug --filter FullyQualifiedName~SenseVoiceIntegrationTests
+```
+
 Release publish:
 
 ```powershell
 dotnet publish .\src\MicType.Windows\MicType.Windows.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\MicType-win-x64
 ```
 
-## M0 Stop Point
+## M1 ASR Notes
 
-Before replacing `PlaceholderSpeechEngine`, complete `docs/M0-验证报告.md`:
-
-1. Verify whether Qwen3-ASR has a practical Windows runtime.
-2. Benchmark sherpa-onnx + SenseVoice and whisper.cpp on the same test set.
-3. Validate the low-level keyboard hook on real Windows apps and UAC/fullscreen boundaries.
-4. Validate UIA selected-text reading in Word, Chrome, WeChat PC, and fallback behavior.
-
-Do not ship a user-facing Windows build until M0 selects the ASR engine and the M1 dictation loop passes on real hardware.
+- Default ASR engine: `org.k2fsa.sherpa.onnx` + `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`.
+- Model config: `language=auto`, inverse text normalization enabled, CPU provider.
+- SenseVoice does not use the custom vocabulary list as a native hotword file; MicType keeps the existing `wrong=right` post-processing path for exact replacements.
+- CI includes a Windows-only integration job that downloads the official model archive and transcribes the bundled `test_wavs\zh.wav`.

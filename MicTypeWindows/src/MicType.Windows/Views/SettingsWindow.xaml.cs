@@ -7,6 +7,7 @@ namespace MicType.Win.Views;
 
 public partial class SettingsWindow : Window
 {
+    private readonly SenseVoiceModelDownloader _modelDownloader = SenseVoiceModelDownloader.Shared;
     private AppSettings Settings => SettingsStore.Instance.Current;
 
     public SettingsWindow()
@@ -14,12 +15,15 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         LoadSettingsIntoUi();
         ApplyTexts();
+        _modelDownloader.StateChanged += OnModelDownloadStateChanged;
+        ApplyModelState(_modelDownloader.CurrentState);
         L10n.LanguageChanged += ApplyTexts;
     }
 
     protected override void OnClosed(EventArgs e)
     {
         L10n.LanguageChanged -= ApplyTexts;
+        _modelDownloader.StateChanged -= OnModelDownloadStateChanged;
         base.OnClosed(e);
     }
 
@@ -56,9 +60,9 @@ public partial class SettingsWindow : Window
             "轻点：开始 / 结束听写 · 按住说话、松手：执行语音指令 · 录音中按 Esc 取消。",
             "Tap: start / stop dictation · Hold to speak a command, release to run · Esc cancels.");
         AsrStatusLabel.Text = L10n.Tr("本地识别引擎", "Local speech engine");
-        AsrStatusText.Text = L10n.Tr(
-            "当前是 Windows 工程骨架：ASR 接口已就绪，但 sherpa-onnx / whisper.cpp 需要 M0 在 Windows 11 真机跑分后接入。",
-            "This is the Windows engineering scaffold: the ASR interface is ready, but sherpa-onnx / whisper.cpp must be selected after M0 on a real Windows 11 machine.");
+        DownloadModelButton.Content = L10n.Tr("下载模型", "Download model");
+        RedownloadModelButton.Content = L10n.Tr("重新下载", "Re-download");
+        CancelModelDownloadButton.Content = L10n.Tr("取消", "Cancel");
         VocabularyLabel.Text = L10n.Tr("专有词汇表（逗号或换行分隔）", "Custom vocabulary (comma or newline separated)");
         VocabularyHelp.Text = L10n.Tr(
             "普通词条提升识别命中率；「杰文=捷文」格式则把左边强制替换为右边——适合同音人名等热词救不了的情况。",
@@ -78,9 +82,10 @@ public partial class SettingsWindow : Window
         AboutMeLabel.Text = L10n.Tr("关于我（可选）", "About me (optional)");
         RulesLabel.Text = L10n.Tr("自定义规则（可选）", "Custom rules (optional)");
         AboutText.Text = L10n.Tr(
-            "Windows 版目标：右 Ctrl 轻点语音输入，长按说指令；录音和本地识别不上传；文本可按你的 GPT / DeepSeek API 润色或执行指令。\n\n当前版本是可继续开发的工程骨架，等待 M0 选定本地 ASR 引擎。",
-            "Windows goal: tap Right Ctrl to dictate, hold it to command AI. Audio and local recognition stay on device; text can be polished or executed through your GPT / DeepSeek API.\n\nThis build is a development scaffold awaiting the M0 local-ASR decision.");
+            "Windows 版目标：右 Ctrl 轻点语音输入，长按说指令；录音和本地识别不上传；文本可按你的 GPT / DeepSeek API 润色或执行指令。\n\n当前版本使用 sherpa-onnx + SenseVoice 本地识别。",
+            "Windows goal: tap Right Ctrl to dictate, hold it to command AI. Audio and local recognition stay on device; text can be polished or executed through your GPT / DeepSeek API.\n\nThis build uses local sherpa-onnx + SenseVoice recognition.");
         SaveButton.Content = L10n.Tr("保存设置", "Save Settings");
+        ApplyModelState(_modelDownloader.CurrentState);
     }
 
     private void OnLanguageChanged(object sender, SelectionChangedEventArgs e)
@@ -135,6 +140,55 @@ public partial class SettingsWindow : Window
         TestResultText.Text = L10n.Tr("测试中…", "Testing…");
         var result = await LlmClient.TestModelAsync(model);
         TestResultText.Text = result.Message;
+    }
+
+    private async void OnDownloadModel(object sender, RoutedEventArgs e)
+    {
+        await DownloadModelAsync(force: false);
+    }
+
+    private async void OnRedownloadModel(object sender, RoutedEventArgs e)
+    {
+        await DownloadModelAsync(force: true);
+    }
+
+    private void OnCancelModelDownload(object sender, RoutedEventArgs e)
+    {
+        _modelDownloader.CancelDownload();
+    }
+
+    private async Task DownloadModelAsync(bool force)
+    {
+        try
+        {
+            await _modelDownloader.DownloadAsync(force);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (MTException ex)
+        {
+            AsrStatusText.Text = ex.UserMessage;
+        }
+    }
+
+    private void OnModelDownloadStateChanged(SenseVoiceDownloadState state)
+    {
+        Dispatcher.Invoke(() => ApplyModelState(state));
+    }
+
+    private void ApplyModelState(SenseVoiceDownloadState state)
+    {
+        AsrStatusText.Text = state.StatusText;
+        ModelDirectoryText.Text = L10n.Tr("模型目录：", "Model folder: ") + _modelDownloader.ModelDirectory;
+
+        ModelDownloadProgress.Visibility = state.IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+        ModelDownloadProgress.IsIndeterminate = state.IsDownloading && state.Progress is null;
+        ModelDownloadProgress.Value = state.Progress.HasValue ? state.Progress.Value * 100 : 0;
+
+        DownloadModelButton.IsEnabled = !state.IsDownloading && !state.IsAvailable;
+        RedownloadModelButton.IsEnabled = !state.IsDownloading;
+        CancelModelDownloadButton.Visibility = state.IsDownloading ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void SaveUiIntoSettings()
