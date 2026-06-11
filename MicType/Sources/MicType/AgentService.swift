@@ -29,14 +29,15 @@ enum LLMClient {
 
     /// 调用 chat/completions。completion 在主线程回调：(结果, 失败原因)。
     /// model：润色传 currentPolishModel（快），指令传 currentCommandModel（强）。
+    /// temperature：润色传 0.25（保真任务要低温）；指令传 nil 用模型默认（更自然，且推理系模型只接受默认）。
     static func chat(messages: [[String: String]],
-                     temperature: Double,
+                     temperature: Double?,
                      timeout: TimeInterval,
                      model: String,
                      completion: @escaping (String?, String?) -> Void) {
         perform(messages: messages, temperature: temperature, timeout: timeout, model: model) { result, failure in
             // 推理系模型（gpt-5.5 / *-pro 等）只接受默认 temperature：被拒时去掉该参数重试一次
-            if result == nil, let failure = failure, failure.lowercased().contains("temperature") {
+            if result == nil, temperature != nil, let failure = failure, failure.lowercased().contains("temperature") {
                 perform(messages: messages, temperature: nil, timeout: timeout, model: model, completion: completion)
             } else {
                 completion(result, failure)
@@ -188,7 +189,7 @@ enum AgentService {
         判断依据：指令的动作落在「这段文字」上→MODIFY；落在「发来这段文字的人」上→REPLY；都不是→NEW。
         从第二行起输出执行结果，规则按意图执行：
         - MODIFY：严格按指令修改；指令未涉及的部分保持原样；保持原文语言（除非指令明确要求翻译）；保留人名、日期、数字、条件、否定等事实。
-        - REPLY：代用户口吻起草可直接发送的回复，自然得体、不卑不亢；口述里的具体要求（同意/拒绝/要点/语气）必须严格体现；不编造用户没表达的承诺；语言与对方消息一致，除非用户另有要求。
+        - REPLY：代用户口吻起草可直接发送的回复，自然得体、不卑不亢；口述里的具体要求（同意/拒绝/要点/语气）必须严格体现；不编造用户没表达的承诺；语言与对方消息一致，除非用户另有要求。【铁律】回复必须是你新撰写的内容，绝不复述、拼接或改写选中文本里对方说的话。
         - NEW：如果是问题，像优秀的 AI 助手一样给出完整、准确的回答，可以展开解释；如果是代用户写东西，输出可直接使用的成品——你不知道的关键事实（具体人名、日期、金额）不要编造，用占位符（中文【待补充】，英文 [TBD]），常识性内容正常发挥。
         除第一行的意图词和之后的结果正文外，不要"好的""以下是"之类的前后缀。
         """
@@ -199,7 +200,7 @@ enum AgentService {
         LLMClient.chat(messages: [
             ["role": "system", "content": system],
             ["role": "user", "content": user],
-        ], temperature: 0.35, timeout: 40, model: Settings.shared.currentCommandModel) { result, failure in
+        ], temperature: nil, timeout: 40, model: Settings.shared.currentCommandModel) { result, failure in
             guard let result = result else {
                 completion(nil, nil, failure)
                 return
@@ -262,7 +263,7 @@ enum AgentService {
         LLMClient.chat(messages: [
             ["role": "system", "content": system],
             ["role": "user", "content": userContent],
-        ], temperature: 0.5, timeout: 40, model: Settings.shared.currentCommandModel, completion: completion)
+        ], temperature: nil, timeout: 40, model: Settings.shared.currentCommandModel, completion: completion)
     }
 
     /// 技能：根据选中的对方消息草拟回复（显式触发词「帮我回复」等直通此处）
@@ -276,6 +277,7 @@ enum AgentService {
         3. 不编造用户没有表达的承诺或事实；信息不足时用开放但明确的表述。
         4. 使用与对方消息一致的语言，除非用户另有要求。
         5. 只输出回复正文，不解释。
+        6.【铁律】回复必须是你新撰写的内容，绝不复述、拼接或改写"对方消息/上下文"里的原话。
         """
         if let vocab = vocabHint() { system += vocab }
         system += userContextHint()
@@ -285,6 +287,6 @@ enum AgentService {
         LLMClient.chat(messages: [
             ["role": "system", "content": system],
             ["role": "user", "content": user],
-        ], temperature: 0.4, timeout: 25, model: Settings.shared.currentCommandModel, completion: completion)
+        ], temperature: nil, timeout: 25, model: Settings.shared.currentCommandModel, completion: completion)
     }
 }
