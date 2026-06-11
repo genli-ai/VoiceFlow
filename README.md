@@ -132,9 +132,12 @@ MicType/
 └── Package.resolved               # Locked dependency versions
 
 scripts/                       # Repair tools and tokenizer generator
+MicTypeWindows/                # Windows port (C# / .NET, work in progress)
 Install MicType.command       # One-click installer (build from source)
 Uninstall MicType.command     # Uninstaller
 ```
+
+> 🚧 A **Windows port** is in early development in [MicTypeWindows/](MicTypeWindows/) — not usable yet. / **Windows 版**正在 [MicTypeWindows/](MicTypeWindows/) 子目录开发中，尚不可用。
 
 ## Credits and License
 
