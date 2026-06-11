@@ -15,6 +15,24 @@ enum LLMClient {
         NSURLErrorSecureConnectionFailed,
     ]
 
+    /// 测试某个模型的连通性与速度。completion 在主线程回调（是否成功, 含耗时的提示）。
+    static func testModel(_ model: String, completion: @escaping (Bool, String) -> Void) {
+        guard KeychainHelper.loadAPIKey() != nil else {
+            completion(false, tr("还没有填 API Key", "No API key yet"))
+            return
+        }
+        let start = Date()
+        chat(messages: [["role": "user", "content": "请只回复一个字：好"]],
+             temperature: nil, timeout: 30, model: model) { result, failure in
+            let secs = String(format: "%.1f", Date().timeIntervalSince(start))
+            if let r = result {
+                completion(true, "✓ \(secs)s · " + tr("返回：", "Response: ") + String(r.prefix(20)))
+            } else {
+                completion(false, "✗ " + (failure ?? tr("未知原因", "unknown")))
+            }
+        }
+    }
+
     /// 录音开始时调用：预热到 API 的连接（DNS + TLS 握手在用户说话期间完成），结果丢弃
     static func prewarm() {
         guard let apiKey = KeychainHelper.loadAPIKey() else { return }
@@ -205,7 +223,7 @@ enum AgentService {
         LLMClient.chat(messages: [
             ["role": "system", "content": system],
             ["role": "user", "content": user],
-        ], temperature: nil, timeout: 40, model: Settings.shared.currentCommandModel) { result, failure in
+        ], temperature: Settings.shared.commandTemperature, timeout: 40, model: Settings.shared.currentCommandModel) { result, failure in
             guard let result = result else {
                 completion(nil, nil, failure)
                 return
@@ -268,7 +286,7 @@ enum AgentService {
         LLMClient.chat(messages: [
             ["role": "system", "content": system],
             ["role": "user", "content": userContent],
-        ], temperature: nil, timeout: 40, model: Settings.shared.currentCommandModel, completion: completion)
+        ], temperature: Settings.shared.commandTemperature, timeout: 40, model: Settings.shared.currentCommandModel, completion: completion)
     }
 
     /// 技能：根据选中的对方消息草拟回复（显式触发词「帮我回复」等直通此处）
@@ -292,6 +310,6 @@ enum AgentService {
         LLMClient.chat(messages: [
             ["role": "system", "content": system],
             ["role": "user", "content": user],
-        ], temperature: nil, timeout: 25, model: Settings.shared.currentCommandModel, completion: completion)
+        ], temperature: Settings.shared.commandTemperature, timeout: 25, model: Settings.shared.currentCommandModel, completion: completion)
     }
 }

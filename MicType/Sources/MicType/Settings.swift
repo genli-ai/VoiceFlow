@@ -98,6 +98,8 @@ enum SettingsKeys {
     static let chatModel = "chatModel"                     // OpenAI 润色模型（快）
     static let openaiCommandModel = "openaiCommandModel"   // OpenAI 指令模型（强）
     static let deepseekCommandModel = "deepseekCommandModel"
+    static let polishTemperature = "polishTemperature"     // 润色温度（默认 0.5）
+    static let commandTemperature = "commandTemperature"   // 指令温度（默认 1.0 = 模型默认）
     static let aboutMe = "aboutMe"
     static let customPolishRules = "customPolishRules"
     static let customVocabulary = "customVocabulary"
@@ -125,6 +127,8 @@ final class Settings {
             SettingsKeys.chatModel: "gpt-5.4-nano",
             SettingsKeys.openaiCommandModel: "gpt-5.4-mini",
             SettingsKeys.deepseekCommandModel: LLMProvider.deepseek.defaultModel,
+            SettingsKeys.polishTemperature: 0.5,
+            SettingsKeys.commandTemperature: 1.0,
             SettingsKeys.aboutMe: "",
             SettingsKeys.customPolishRules: "",
             SettingsKeys.customVocabulary: "",
@@ -250,6 +254,16 @@ final class Settings {
     var deepseekCommandModel: String {
         get { d.string(forKey: SettingsKeys.deepseekCommandModel) ?? LLMProvider.deepseek.defaultModel }
         set { d.set(newValue, forKey: SettingsKeys.deepseekCommandModel) }
+    }
+
+    /// 润色温度（低=稳定保真）；指令温度（1.0 = 模型默认，最自然）
+    var polishTemperature: Double {
+        get { d.object(forKey: SettingsKeys.polishTemperature) as? Double ?? 0.5 }
+        set { d.set(newValue, forKey: SettingsKeys.polishTemperature) }
+    }
+    var commandTemperature: Double {
+        get { d.object(forKey: SettingsKeys.commandTemperature) as? Double ?? 1.0 }
+        set { d.set(newValue, forKey: SettingsKeys.commandTemperature) }
     }
 
     /// 「关于我」：署名、惯用语气等，注入语音指令 prompt

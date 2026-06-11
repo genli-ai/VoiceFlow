@@ -18,9 +18,8 @@ enum PolishService {
             ["role": "user", "content": rawText],
         ]
 
-        // 0.5：长口述重构需要一点文笔流畅度；再高怕 nano 这类小模型自由发挥违反保真红线
         LLMClient.chat(messages: messages,
-                       temperature: 0.5,
+                       temperature: Settings.shared.polishTemperature,
                        timeout: 20,
                        model: Settings.shared.currentPolishModel,
                        completion: completion)
@@ -68,18 +67,4 @@ enum PolishService {
         return prompt
     }
 
-    /// 测试 API 连接。completion 在主线程回调 (是否成功, 提示信息)。
-    static func test(completion: @escaping (Bool, String) -> Void) {
-        guard KeychainHelper.loadAPIKey() != nil else {
-            completion(false, tr("还没有填 API Key", "No API key yet"))
-            return
-        }
-        polish("测试，嗯，这是一条，呃，测试消息", level: .smart) { result, failure in
-            if let r = result {
-                completion(true, tr("连接成功 ✓ 返回：", "Connected ✓ Response: ") + r)
-            } else {
-                completion(false, tr("连接失败——", "Connection failed — ") + (failure ?? tr("未知原因", "unknown")))
-            }
-        }
-    }
 }

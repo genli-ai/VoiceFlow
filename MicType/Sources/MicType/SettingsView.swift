@@ -261,6 +261,8 @@ private struct PolishTab: View {
     @AppStorage(SettingsKeys.deepseekBaseURL) private var dsBaseURL = LLMProvider.deepseek.defaultBaseURL
     @AppStorage(SettingsKeys.deepseekModel) private var dsModel = LLMProvider.deepseek.defaultModel
     @AppStorage(SettingsKeys.deepseekCommandModel) private var dsCommandModel = LLMProvider.deepseek.defaultModel
+    @AppStorage(SettingsKeys.polishTemperature) private var polishTemp = 0.5
+    @AppStorage(SettingsKeys.commandTemperature) private var commandTemp = 1.0
     @AppStorage(SettingsKeys.aboutMe) private var aboutMe = ""
     @State private var apiKey = KeychainHelper.loadAPIKey() ?? ""
     @State private var openaiSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.openai.keychainAccount) != nil)
@@ -328,17 +330,6 @@ private struct PolishTab: View {
                             ? tr("已保存 ✓", "Saved ✓") : tr("已清空", "Cleared")
                     }
                     Spacer()
-                    Button(testing ? tr("测试中…", "Testing…") : tr("测试连接", "Test Connection")) {
-                        testing = true
-                        testResult = ""
-                        KeychainHelper.saveAPIKey(apiKey)
-                        refreshSavedStates()
-                        PolishService.test { _, message in
-                            testing = false
-                            testResult = message
-                        }
-                    }
-                    .disabled(testing)
                 }
                 Text(tr("Key 加密保存在 macOS 系统钥匙串里（可在「钥匙串访问」App 中查看），仅本机可读，不写入任何明文文件。两个服务商的 Key 都可以保存，互不覆盖。",
                         "Keys are encrypted in the macOS Keychain (visible in the Keychain Access app), readable only on this Mac, never written to plain files. Both providers' keys can be saved independently."))
@@ -354,9 +345,13 @@ private struct PolishTab: View {
                     TextField(tr("Base URL", "Base URL"), text: $dsBaseURL)
                         .textFieldStyle(.roundedBorder)
                     ModelField(label: tr("润色模型（求快）", "Polish model (fast)"),
-                               text: $dsModel, presets: Self.deepseekPresets)
+                               text: $dsModel, presets: Self.deepseekPresets,
+                               testing: testing,
+                               onTest: { runModelTest(tr("润色模型", "Polish model"), dsModel) })
                     ModelField(label: tr("指令模型（求好）", "Command model (strong)"),
-                               text: $dsCommandModel, presets: Self.deepseekPresets)
+                               text: $dsCommandModel, presets: Self.deepseekPresets,
+                               testing: testing,
+                               onTest: { runModelTest(tr("指令模型", "Command model"), dsCommandModel) })
                     Text(tr("润色高频求快、指令低频求好，两个模型分开配。右侧下拉快选：flash 快且便宜，pro 更强，deepseek-chat 是 flash 非思考别名（响应慢时用）。也可手填任意模型名。Key 在 platform.deepseek.com 申请。",
                             "Polish runs often and wants speed; commands run rarely and want quality. Quick-pick on the right: flash is fast & cheap, pro is stronger, deepseek-chat is flash without thinking mode. Or type any model name. Get a key at platform.deepseek.com."))
                         .font(.caption)
@@ -365,14 +360,37 @@ private struct PolishTab: View {
                     TextField(tr("Base URL", "Base URL"), text: $baseURL)
                         .textFieldStyle(.roundedBorder)
                     ModelField(label: tr("润色模型（求快）", "Polish model (fast)"),
-                               text: $chatModel, presets: Self.openaiPresets)
+                               text: $chatModel, presets: Self.openaiPresets,
+                               testing: testing,
+                               onTest: { runModelTest(tr("润色模型", "Polish model"), chatModel) })
                     ModelField(label: tr("指令模型（求好）", "Command model (strong)"),
-                               text: $openaiCommandModel, presets: Self.openaiPresets)
+                               text: $openaiCommandModel, presets: Self.openaiPresets,
+                               testing: testing,
+                               onTest: { runModelTest(tr("指令模型", "Command model"), openaiCommandModel) })
                     Text(tr("润色高频求快（默认 nano），指令低频求好（默认 mini）。右侧下拉可快选 OpenAI 当前在售型号——gpt-5.4 标准版质量高于 mini 价格半于 5.5，gpt-5.5 旗舰最强。也可手填任何 OpenAI 兼容服务的模型名。",
                             "Polish runs often and wants speed (default nano); commands run rarely and want quality (default mini). Quick-pick current OpenAI models on the right — gpt-5.4 beats mini at half the price of 5.5; gpt-5.5 is the flagship. Or type any OpenAI-compatible model name."))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                HStack {
+                    Text(tr("润色温度：", "Polish temperature:"))
+                    Slider(value: $polishTemp, in: 0...1.5)
+                    Text(String(format: "%.2f", polishTemp))
+                        .monospacedDigit()
+                        .frame(width: 38, alignment: .trailing)
+                }
+                HStack {
+                    Text(tr("指令温度：", "Command temperature:"))
+                    Slider(value: $commandTemp, in: 0...1.5)
+                    Text(String(format: "%.2f", commandTemp))
+                        .monospacedDigit()
+                        .frame(width: 38, alignment: .trailing)
+                }
+                Text(tr("低 = 稳定保真，高 = 自然多样。默认：润色 0.5 / 指令 1.00（即模型默认值）。推理系模型（gpt-5.5 等）只接受默认温度，其他值会被自动忽略。",
+                        "Lower = faithful and stable; higher = natural and varied. Defaults: polish 0.5 / commands 1.00 (the model default). Reasoning models (gpt-5.5 etc.) only accept the default — other values are ignored automatically."))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section {
@@ -415,13 +433,27 @@ private struct PolishTab: View {
         openaiSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.openai.keychainAccount) != nil)
         dsSaved = (KeychainHelper.loadAPIKey(account: LLMProvider.deepseek.keychainAccount) != nil)
     }
+
+    /// 单个模型的连通性/速度测试（先把输入框里的 Key 存进钥匙串再测）
+    private func runModelTest(_ name: String, _ model: String) {
+        testing = true
+        testResult = ""
+        KeychainHelper.saveAPIKey(apiKey)
+        refreshSavedStates()
+        LLMClient.testModel(model) { _, message in
+            testing = false
+            testResult = name + "（\(model)）" + tr("：", ": ") + message
+        }
+    }
 }
 
-/// 模型名输入框 + 预设快选下拉（仍可手填任意兼容模型名）
+/// 模型名输入框 + 预设快选下拉（仍可手填任意兼容模型名）+ 单独的测试按钮
 private struct ModelField: View {
     let label: String
     @Binding var text: String
     let presets: [String]
+    var testing: Bool = false
+    var onTest: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 6) {
@@ -436,6 +468,11 @@ private struct ModelField: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            if let onTest = onTest {
+                Button(testing ? tr("测试中…", "Testing…") : tr("测试", "Test"), action: onTest)
+                    .disabled(testing)
+                    .fixedSize()
+            }
         }
     }
 }
@@ -467,8 +504,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.2.7 · Qwen3-ASR 引擎 + 语音指令",
-                    "Version 3.2.7 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.2.8 · Qwen3-ASR 引擎 + 语音指令",
+                    "Version 3.2.8 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))
