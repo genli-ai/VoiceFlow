@@ -105,6 +105,23 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
         }
     }
 
+    /// 空音频幻觉检测：模型对无声输入会把热词上下文"复读"成识别结果。
+    /// 判定：输出以"常用词汇"开头，或命中 ≥3 个词表词且去掉词表词后几乎不剩内容。
+    private static func isVocabEcho(_ text: String, terms: [String]) -> Bool {
+        guard !text.isEmpty else { return false }
+        if text.hasPrefix("常用词汇") { return true }
+        guard terms.count >= 3 else { return false }
+        var residue = text
+        var hits = 0
+        for term in terms where residue.contains(term) {
+            hits += 1
+            residue = residue.replacingOccurrences(of: term, with: "")
+        }
+        guard hits >= 3 else { return false }
+        residue = residue.filter { !"、，,。.；; ：:".contains($0) }
+        return residue.count <= max(2, text.count / 10)
+    }
+
     func preload() {
         guard isModelAvailable, ensureTokenizerFile() == nil else { return }
         _ = ensureLoadTask()
@@ -167,7 +184,8 @@ final class QwenEngine: SpeechEngine, @unchecked Sendable {
                     temperature: 0.0
                 )
                 let cleaned = TextPostProcessor.cleanTranscript(result.text)
-                DispatchQueue.main.async { completion(.success(cleaned)) }
+                let final = Self.isVocabEcho(cleaned, terms: vocabTerms) ? "" : cleaned
+                DispatchQueue.main.async { completion(.success(final)) }
             } catch {
                 let message = error.localizedDescription
                 DispatchQueue.main.async {

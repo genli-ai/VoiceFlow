@@ -151,6 +151,14 @@ final class DictationController {
             return
         }
 
+        // 几乎无声（误触或没说话）：不送识别——空音频会诱发模型把热词上下文"复读"成识别结果
+        let peak = samples.reduce(0) { max($0, abs($1)) }
+        guard peak >= 0.012 else {
+            phase = .idle
+            overlay.flashError(tr("没有听到内容", "Nothing heard"))
+            return
+        }
+
         phase = .processing
         overlay.showProcessing(tr("识别中…", "Transcribing…"))
         let isColdStart = !QwenEngine.shared.isModelReady
