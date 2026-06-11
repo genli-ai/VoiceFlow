@@ -1,0 +1,18 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MicType.Windows.Tests", "MicType.Windows.Tests\MicType.Windows.Tests.csproj", "{B70470F3-42D6-4C21-9CE6-7E4E5AF96B41}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B70470F3-42D6-4C21-9CE6-7E4E5AF96B41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B70470F3-42D6-4C21-9CE6-7E4E5AF96B41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B70470F3-42D6-4C21-9CE6-7E4E5AF96B41}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B70470F3-42D6-4C21-9CE6-7E4E5AF96B41}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

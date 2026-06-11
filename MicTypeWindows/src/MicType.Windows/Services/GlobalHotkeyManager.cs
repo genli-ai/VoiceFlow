@@ -19,7 +19,7 @@ public sealed class GlobalHotkeyManager : IDisposable
     private DateTimeOffset? _pressedAt;
     private bool _tapCandidate;
     private bool _skillActive;
-    private Timer? _holdTimer;
+    private System.Threading.Timer? _holdTimer;
 
     public GlobalHotkeyManager()
     {
@@ -99,7 +99,7 @@ public sealed class GlobalHotkeyManager : IDisposable
         _pressedAt = DateTimeOffset.Now;
         _skillActive = false;
         _holdTimer?.Dispose();
-        _holdTimer = new Timer(_ =>
+        _holdTimer = new System.Threading.Timer(_ =>
         {
             if (!_tapCandidate || IsRecording()) return;
             _skillActive = true;
@@ -115,6 +115,10 @@ public sealed class GlobalHotkeyManager : IDisposable
         {
             _skillActive = false;
             SkillEnd?.Invoke();
+        }
+        else if (_tapCandidate && IsRecording())
+        {
+            TapToggle?.Invoke();
         }
         else if (_tapCandidate && _pressedAt is { } t &&
                  DateTimeOffset.Now - t < TimeSpan.FromMilliseconds(600))
@@ -137,7 +141,6 @@ public sealed class GlobalHotkeyManager : IDisposable
     {
         HotkeyChoice.RightControl => 0xA3,
         HotkeyChoice.RightShift => 0xA1,
-        HotkeyChoice.CapsLock => 0x14,
         _ => 0xA3
     };
 

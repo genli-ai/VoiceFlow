@@ -67,7 +67,6 @@ public partial class App : Application
         var hotkey = SettingsStore.Instance.Current.Hotkey switch
         {
             HotkeyChoice.RightShift => "Right Shift",
-            HotkeyChoice.CapsLock => "CapsLock",
             _ => "Right Ctrl"
         };
         menu.Items.Add(new Forms.ToolStripLabel(

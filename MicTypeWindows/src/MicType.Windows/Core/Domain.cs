@@ -16,8 +16,7 @@ public enum AppLanguage
 public enum HotkeyChoice
 {
     RightControl,
-    RightShift,
-    CapsLock
+    RightShift
 }
 
 public enum PolishLevel

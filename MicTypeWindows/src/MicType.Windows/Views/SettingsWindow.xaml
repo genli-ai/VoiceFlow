@@ -18,7 +18,6 @@
                     <ComboBox x:Name="HotkeyBox" Width="220" HorizontalAlignment="Left" Margin="0,6,0,14">
                         <ComboBoxItem Tag="RightControl" Content="Right Ctrl" />
                         <ComboBoxItem Tag="RightShift" Content="Right Shift" />
-                        <ComboBoxItem Tag="CapsLock" Content="CapsLock" />
                     </ComboBox>
                     <CheckBox x:Name="PlaySoundsBox" Margin="0,0,0,8" Content="Play sounds" />
                     <CheckBox x:Name="RestoreClipboardBox" Margin="0,0,0,8" Content="Restore clipboard after paste" />

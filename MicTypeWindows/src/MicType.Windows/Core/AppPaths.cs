@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace MicType.Win.Core;
 
 public static class AppPaths
