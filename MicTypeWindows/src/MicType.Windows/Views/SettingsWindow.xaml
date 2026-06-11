@@ -27,7 +27,19 @@
             <TabItem x:Name="RecognitionTab" Header="Recognition">
                 <StackPanel Margin="16">
                     <TextBlock x:Name="AsrStatusLabel" FontWeight="SemiBold" />
-                    <TextBlock x:Name="AsrStatusText" TextWrapping="Wrap" Foreground="#A16207" Margin="0,6,0,14" />
+                    <TextBlock x:Name="AsrStatusText" TextWrapping="Wrap" Foreground="#A16207" Margin="0,6,0,8" />
+                    <TextBlock x:Name="ModelDirectoryText" TextWrapping="Wrap" Foreground="#666" Margin="0,0,0,10" />
+                    <ProgressBar x:Name="ModelDownloadProgress"
+                                 Height="12"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Visibility="Collapsed"
+                                 Margin="0,0,0,10" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Button x:Name="DownloadModelButton" Width="130" Margin="0,0,8,0" Click="OnDownloadModel" />
+                        <Button x:Name="RedownloadModelButton" Width="130" Margin="0,0,8,0" Click="OnRedownloadModel" />
+                        <Button x:Name="CancelModelDownloadButton" Width="100" Click="OnCancelModelDownload" Visibility="Collapsed" />
+                    </StackPanel>
                     <TextBlock x:Name="VocabularyLabel" FontWeight="SemiBold" />
                     <TextBox x:Name="VocabularyBox" AcceptsReturn="True" TextWrapping="Wrap" Height="130" Margin="0,6,0,8" />
                     <TextBlock x:Name="VocabularyHelp" TextWrapping="Wrap" Foreground="#666" />

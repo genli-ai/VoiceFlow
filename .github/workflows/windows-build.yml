@@ -51,3 +51,34 @@ jobs:
           name: MicType-windows-x64
           path: MicTypeWindows/publish/
           retention-days: 30
+
+  sensevoice-integration:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Cache SenseVoice model
+        uses: actions/cache@v4
+        with:
+          path: MicTypeWindows/.model-cache/sensevoice
+          key: sensevoice-${{ runner.os }}-sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17-v1
+
+      - name: Restore tests
+        run: dotnet restore MicTypeWindows/tests/MicTypeWindows.Tests.sln
+
+      - name: SenseVoice real transcription test
+        shell: pwsh
+        env:
+          MICTYPE_RUN_SENSEVOICE_INTEGRATION: "1"
+          MICTYPE_SENSEVOICE_MODEL_DIR: ${{ github.workspace }}\MicTypeWindows\.model-cache\sensevoice
+        run: >
+          dotnet test MicTypeWindows/tests/MicTypeWindows.Tests.sln
+          -c Debug
+          --filter FullyQualifiedName~SenseVoiceIntegrationTests
+          --logger "console;verbosity=normal"

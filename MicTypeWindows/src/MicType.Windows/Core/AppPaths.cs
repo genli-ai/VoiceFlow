@@ -32,7 +32,17 @@ public static class AppPaths
     {
         get
         {
-            var dir = Path.Combine(LocalDataDir, "models");
+            var dir = Path.Combine(AppDataDir, "models");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
+    public static string SenseVoiceModelDir
+    {
+        get
+        {
+            var dir = Path.Combine(ModelsDir, "sensevoice");
             Directory.CreateDirectory(dir);
             return dir;
         }

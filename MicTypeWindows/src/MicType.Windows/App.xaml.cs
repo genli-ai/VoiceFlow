@@ -14,12 +14,15 @@ public partial class App : Application
     private GlobalHotkeyManager? _hotkeys;
     private OverlayWindow? _overlay;
     private SettingsWindow? _settingsWindow;
+    private ISpeechEngine? _speechEngine;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         _overlay = new OverlayWindow();
-        _dictation = new DictationController(new PlaceholderSpeechEngine(), _overlay);
+        _speechEngine = new SenseVoiceSpeechEngine();
+        _dictation = new DictationController(_speechEngine, _overlay);
+        _speechEngine.Preload();
         _hotkeys = new GlobalHotkeyManager
         {
             IsRecording = () => _dictation?.IsRecording == true
@@ -40,6 +43,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeys?.Dispose();
+        _speechEngine?.UnloadModel();
         _tray?.Dispose();
         base.OnExit(e);
     }
