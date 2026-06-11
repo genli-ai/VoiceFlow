@@ -40,20 +40,6 @@ enum HotkeyChoice: String, CaseIterable {
     }
 }
 
-// MARK: - 触发模式
-
-enum TriggerMode: String, CaseIterable {
-    case toggle  // 按一下开始 / 再按一下结束
-    case hold    // 按住说话，松开结束
-
-    var displayName: String {
-        switch self {
-        case .toggle: return tr("按一下开始 / 再按结束", "Tap to start / tap to stop")
-        case .hold: return tr("按住说话，松开结束", "Hold to talk, release to stop")
-        }
-    }
-}
-
 // MARK: - 润色档位
 
 enum PolishLevel: String, CaseIterable {
@@ -106,7 +92,6 @@ enum LLMProvider: String, CaseIterable {
 
 enum SettingsKeys {
     static let hotkey = "hotkey"
-    static let triggerMode = "triggerMode"
     static let polishEnabled = "polishEnabled"
     static let polishLevel = "polishLevel"
     static let openaiBaseURL = "openaiBaseURL"
@@ -133,7 +118,6 @@ final class Settings {
     private init() {
         d.register(defaults: [
             SettingsKeys.hotkey: HotkeyChoice.rightOption.rawValue,
-            SettingsKeys.triggerMode: TriggerMode.toggle.rawValue,
             SettingsKeys.polishEnabled: true,
             SettingsKeys.polishLevel: PolishLevel.smart.rawValue,
             SettingsKeys.openaiBaseURL: "https://api.openai.com/v1",
@@ -177,11 +161,6 @@ final class Settings {
     var hotkey: HotkeyChoice {
         get { HotkeyChoice(rawValue: d.string(forKey: SettingsKeys.hotkey) ?? "") ?? .rightOption }
         set { d.set(newValue.rawValue, forKey: SettingsKeys.hotkey) }
-    }
-
-    var triggerMode: TriggerMode {
-        get { TriggerMode(rawValue: d.string(forKey: SettingsKeys.triggerMode) ?? "") ?? .toggle }
-        set { d.set(newValue.rawValue, forKey: SettingsKeys.triggerMode) }
     }
 
     var polishEnabled: Bool {

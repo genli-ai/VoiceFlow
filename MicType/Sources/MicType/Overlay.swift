@@ -11,7 +11,8 @@ final class OverlayState: ObservableObject {
         case error(String)
     }
 
-    @Published var mode: Mode = .recording("正在听…")
+    // 占位初值，显示前必然会被 showRecording/showProcessing 覆盖
+    @Published var mode: Mode = .recording("")
     @Published var levels: [Float] = Array(repeating: 0.05, count: 13)
 
     func pushLevel(_ level: Float) {

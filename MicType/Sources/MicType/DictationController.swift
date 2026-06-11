@@ -66,14 +66,6 @@ final class DictationController {
         }
     }
 
-    func holdStart() {
-        if phase == .idle { startRecording() }
-    }
-
-    func holdEnd() {
-        if phase == .recording { finishRecording() }
-    }
-
     /// 指令模式：按住快捷键触发（技能关闭时降级为普通输入）
     func skillHoldStart() {
         guard phase == .idle else { return }

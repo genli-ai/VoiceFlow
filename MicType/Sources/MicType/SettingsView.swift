@@ -8,6 +8,7 @@ import ServiceManagement
 final class SettingsWindowController {
     static let shared = SettingsWindowController()
     private var window: NSWindow?
+    private var langObserver: AnyCancellable?
 
     func show() {
         if window == nil {
@@ -18,6 +19,10 @@ final class SettingsWindowController {
             w.setContentSize(NSSize(width: 560, height: 500))
             w.center()
             window = w
+            // 窗口开着时切换语言，标题也要跟着换
+            langObserver = L10n.shared.$language.sink { [weak self] lang in
+                self?.window?.title = lang == .zh ? "MicType 设置" : "MicType Settings"
+            }
         }
         window?.title = tr("MicType 设置", "MicType Settings")
         NSApp.activate(ignoringOtherApps: true)
@@ -50,7 +55,6 @@ struct SettingsView: View {
 private struct GeneralTab: View {
     @ObservedObject private var l10n = L10n.shared
     @AppStorage(SettingsKeys.hotkey) private var hotkey = HotkeyChoice.rightOption.rawValue
-    @AppStorage(SettingsKeys.triggerMode) private var triggerMode = TriggerMode.toggle.rawValue
     @AppStorage(SettingsKeys.playSounds) private var playSounds = true
     @AppStorage(SettingsKeys.restoreClipboard) private var restoreClipboard = true
     @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
@@ -75,12 +79,8 @@ private struct GeneralTab: View {
                         Text(choice.displayName).tag(choice.rawValue)
                     }
                 }
-                Picker(tr("触发方式：", "Trigger:"), selection: $triggerMode) {
-                    ForEach(TriggerMode.allCases, id: \.rawValue) { mode in
-                        Text(mode.displayName).tag(mode.rawValue)
-                    }
-                }
-                Text(tr("录音中按 Esc 可随时取消。", "Press Esc anytime to cancel recording."))
+                Text(tr("轻点：开始 / 结束听写 · 按住说话、松手：执行语音指令 · 录音中按 Esc 取消。",
+                        "Tap: start / stop dictation · Hold to speak a command, release to run · Esc cancels."))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -241,6 +241,11 @@ private struct RecognitionTab: View {
             QwenEngine.shared.unloadModel()
             refreshTick += 1
         }
+        // 已生成的状态文字是快照，切换语言后清掉，避免残留旧语言
+        .onChange(of: l10n.language) { _, _ in
+            updateMessage = ""
+            if !downloader.isDownloading { downloader.statusText = "" }
+        }
     }
 }
 
@@ -383,6 +388,10 @@ private struct PolishTab: View {
         }
         .formStyle(.grouped)
         .padding(.top, 4)
+        // 测试结果是快照，切换语言后清掉，避免残留旧语言
+        .onChange(of: l10n.language) { _, _ in
+            testResult = ""
+        }
     }
 
     private func refreshSavedStates() {
@@ -418,8 +427,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.1.0 · Qwen3-ASR 引擎 + 语音技能",
-                    "Version 3.1.0 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.1.1 · Qwen3-ASR 引擎 + 语音技能",
+                    "Version 3.1.1 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))

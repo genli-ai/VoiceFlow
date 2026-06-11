@@ -1,15 +1,12 @@
 import AppKit
 
-/// 全局热键监听。
-/// 切换模式：单独"轻点"所选修饰键（按下到松开 < 0.6s 且期间没按其它键）即触发开始/结束；
-/// 按住模式：按下开始，松开结束。
+/// 全局热键监听。触发手势固定为：
+/// 轻点所选修饰键（按下到松开 < 0.6s 且期间没按其它键）= 开始/结束听写；
+/// 按住 0.6s = 进入"指令模式"录音，松开结束（V3 语音技能）；
 /// 录音中按 Esc 取消。
 final class HotkeyManager {
 
     var onTapToggle: (() -> Void)?
-    var onHoldStart: (() -> Void)?
-    var onHoldEnd: (() -> Void)?
-    /// 轻点触发模式下：按住 0.6s 进入"指令模式"录音，松开结束（V3 语音技能）
     var onSkillStart: (() -> Void)?
     var onSkillEnd: (() -> Void)?
     var onCancel: (() -> Void)?
@@ -123,7 +120,6 @@ final class HotkeyManager {
 
     private func handleFlagsChanged(_ event: NSEvent) {
         let choice = Settings.shared.hotkey
-        let mode = Settings.shared.triggerMode
 
         guard event.keyCode == choice.keyCode else {
             // 按了别的修饰键，取消"轻点"判定
@@ -135,49 +131,34 @@ final class HotkeyManager {
         let targetFlag = NSEvent.ModifierFlags(rawValue: choice.flagMask)
         let isDown = flags.contains(targetFlag)
 
-        switch mode {
-        case .toggle:
-            if isDown {
-                // 必须是"只按了这一个修饰键"才算候选
-                if flags == targetFlag {
-                    tapCandidate = true
-                    pressedAt = Date()
-                    // 按住 0.6s 且当前空闲 → 进入指令模式录音
-                    holdWorkItem?.cancel()
-                    let work = DispatchWorkItem { [weak self] in
-                        guard let self = self, self.tapCandidate, !self.isRecording() else { return }
-                        self.skillActive = true
-                        self.onSkillStart?()
-                    }
-                    holdWorkItem = work
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
-                } else {
-                    tapCandidate = false
-                    holdWorkItem?.cancel()
-                }
-            } else {
+        if isDown {
+            // 必须是"只按了这一个修饰键"才算候选
+            if flags == targetFlag {
+                tapCandidate = true
+                pressedAt = Date()
+                // 按住 0.6s 且当前空闲 → 进入指令模式录音
                 holdWorkItem?.cancel()
-                if skillActive {
-                    skillActive = false
-                    DispatchQueue.main.async { [weak self] in self?.onSkillEnd?() }
-                } else if tapCandidate, let t = pressedAt, Date().timeIntervalSince(t) < 0.6 {
-                    DispatchQueue.main.async { [weak self] in self?.onTapToggle?() }
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self = self, self.tapCandidate, !self.isRecording() else { return }
+                    self.skillActive = true
+                    self.onSkillStart?()
                 }
-                tapCandidate = false
-                pressedAt = nil
-            }
-        case .hold:
-            if isDown {
-                if flags == targetFlag, pressedAt == nil {
-                    pressedAt = Date()
-                    DispatchQueue.main.async { [weak self] in self?.onHoldStart?() }
-                }
+                holdWorkItem = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
             } else {
-                if pressedAt != nil {
-                    pressedAt = nil
-                    DispatchQueue.main.async { [weak self] in self?.onHoldEnd?() }
-                }
+                tapCandidate = false
+                holdWorkItem?.cancel()
             }
+        } else {
+            holdWorkItem?.cancel()
+            if skillActive {
+                skillActive = false
+                DispatchQueue.main.async { [weak self] in self?.onSkillEnd?() }
+            } else if tapCandidate, let t = pressedAt, Date().timeIntervalSince(t) < 0.6 {
+                DispatchQueue.main.async { [weak self] in self?.onTapToggle?() }
+            }
+            tapCandidate = false
+            pressedAt = nil
         }
     }
 

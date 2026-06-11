@@ -21,8 +21,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         hotkeys.onTapToggle = { [weak self] in self?.dictation.toggle() }
-        hotkeys.onHoldStart = { [weak self] in self?.dictation.holdStart() }
-        hotkeys.onHoldEnd = { [weak self] in self?.dictation.holdEnd() }
         hotkeys.onSkillStart = { [weak self] in self?.dictation.skillHoldStart() }
         hotkeys.onSkillEnd = { [weak self] in self?.dictation.skillHoldEnd() }
         hotkeys.onCancel = { [weak self] in self?.dictation.cancel() }
@@ -69,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
 
         let hotkeyName = Settings.shared.hotkey.shortSymbol
-        let modeHint = Settings.shared.triggerMode == .toggle ? tr("轻点 ", "Tap ") + hotkeyName + tr(" 听写 · 按住说指令", " to dictate · hold for commands") : tr("按住 ", "Hold ") + hotkeyName + tr(" 说话", " to talk")
+        let modeHint = tr("轻点 ", "Tap ") + hotkeyName + tr(" 听写 · 按住说指令", " to dictate · hold for commands")
         let titleItem = NSMenuItem(title: modeHint, action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
