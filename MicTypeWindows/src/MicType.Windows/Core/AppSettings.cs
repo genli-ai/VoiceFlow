@@ -1,5 +1,7 @@
+using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 
 namespace MicType.Win.Core;
 
@@ -41,8 +43,38 @@ public sealed class AppSettings
         LlmProvider == LlmProvider.OpenAi ? CredentialTargets.OpenAiApiKey : CredentialTargets.DeepSeekApiKey;
 
     [JsonIgnore]
-    public IReadOnlyList<string> VocabularyTerms => CustomVocabulary
-        .Split([',', '，', '、', '\n', '\r'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    public IReadOnlyList<string> VocabularyTerms => ParseVocabulary(CustomVocabulary).Terms;
+
+    [JsonIgnore]
+    public IReadOnlyList<(string Wrong, string Right)> VocabularyReplacements =>
+        ParseVocabulary(CustomVocabulary).Replacements;
+
+    public static (IReadOnlyList<string> Terms, IReadOnlyList<(string Wrong, string Right)> Replacements)
+        ParseVocabulary(string value)
+    {
+        var terms = new List<string>();
+        var replacements = new List<(string Wrong, string Right)>();
+        foreach (var raw in value.Split([',', '，', '、', '\n', '\r'],
+                     StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            var entry = raw.Replace('＝', '=').Trim();
+            var equalsIndex = entry.IndexOf('=');
+            if (equalsIndex >= 0)
+            {
+                var wrong = entry[..equalsIndex].Trim();
+                var right = entry[(equalsIndex + 1)..].Trim();
+                if (wrong.Length == 0 || right.Length == 0) continue;
+                replacements.Add((wrong, right));
+                terms.Add(right);
+            }
+            else if (entry.Length > 0)
+            {
+                terms.Add(entry);
+            }
+        }
+
+        return (terms, replacements);
+    }
 
     private static AppLanguage CultureDefaultLanguage()
     {
@@ -64,7 +96,11 @@ public sealed class SettingsStore
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() }
+        Converters =
+        {
+            new HotkeyChoiceJsonConverter(),
+            new JsonStringEnumConverter()
+        }
     };
 
     private SettingsStore()
@@ -104,5 +140,23 @@ public sealed class SettingsStore
         {
             return new AppSettings();
         }
+    }
+}
+
+public sealed class HotkeyChoiceJsonConverter : JsonConverter<HotkeyChoice>
+{
+    public override HotkeyChoice Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var value = reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
+        return value switch
+        {
+            nameof(HotkeyChoice.RightShift) => HotkeyChoice.RightShift,
+            _ => HotkeyChoice.RightControl
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, HotkeyChoice value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString());
     }
 }

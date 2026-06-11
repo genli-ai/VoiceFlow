@@ -13,13 +13,13 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         LoadSettingsIntoUi();
-        LoadLabels();
-        L10n.LanguageChanged += LoadLabels;
+        ApplyTexts();
+        L10n.LanguageChanged += ApplyTexts;
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        L10n.LanguageChanged -= LoadLabels;
+        L10n.LanguageChanged -= ApplyTexts;
         base.OnClosed(e);
     }
 
@@ -39,7 +39,7 @@ public partial class SettingsWindow : Window
         LoadProviderFields();
     }
 
-    private void LoadLabels()
+    private void ApplyTexts()
     {
         Title = L10n.Tr("MicType 设置", "MicType Settings");
         GeneralTab.Header = L10n.Tr("通用", "General");
@@ -48,6 +48,8 @@ public partial class SettingsWindow : Window
         AboutTab.Header = L10n.Tr("关于", "About");
         LanguageLabel.Text = L10n.Tr("界面语言 / Language", "Language / 界面语言");
         HotkeyLabel.Text = L10n.Tr("听写快捷键", "Dictation hotkey");
+        SetComboContent(HotkeyBox, "RightControl", L10n.Tr("右 Ctrl", "Right Ctrl"));
+        SetComboContent(HotkeyBox, "RightShift", L10n.Tr("右 Shift", "Right Shift"));
         PlaySoundsBox.Content = L10n.Tr("开始 / 完成时播放提示音", "Play sounds on start / finish");
         RestoreClipboardBox.Content = L10n.Tr("输入后恢复原剪贴板内容", "Restore clipboard after inserting");
         GestureHelp.Text = L10n.Tr(
@@ -59,9 +61,11 @@ public partial class SettingsWindow : Window
             "This is the Windows engineering scaffold: the ASR interface is ready, but sherpa-onnx / whisper.cpp must be selected after M0 on a real Windows 11 machine.");
         VocabularyLabel.Text = L10n.Tr("专有词汇表（逗号或换行分隔）", "Custom vocabulary (comma or newline separated)");
         VocabularyHelp.Text = L10n.Tr(
-            "这些词会作为热词/提示参与本地识别与 AI 润色。接入具体 ASR 引擎时必须保留静音门和热词复读防护。",
-            "These terms feed local ASR and AI polish. The silence gate and hotword-echo guard must stay enabled when a concrete ASR engine is wired.");
+            "普通词条提升识别命中率；「杰文=捷文」格式则把左边强制替换为右边——适合同音人名等热词救不了的情况。",
+            "Plain entries bias recognition; \"wrong=right\" force-replaces the left side with the right — for exact homophones that hotwords can't fix.");
         PolishModeLabel.Text = L10n.Tr("润色档位", "Polish mode");
+        SetComboContent(PolishLevelBox, "Off", L10n.Tr("仅识别", "Transcribe only"));
+        SetComboContent(PolishLevelBox, "Smart", L10n.Tr("AI 润色", "AI polish"));
         ProviderLabel.Text = L10n.Tr("当前使用", "Active provider");
         PolishModelLabel.Text = L10n.Tr("润色模型（求快）", "Polish model (fast)");
         CommandModelLabel.Text = L10n.Tr("指令模型（求好）", "Command model (strong)");
@@ -86,6 +90,7 @@ public partial class SettingsWindow : Window
             Enum.TryParse<AppLanguage>((string)item.Tag, out var lang))
         {
             L10n.Language = lang;
+            TestResultText.Text = "";
         }
     }
 
@@ -196,5 +201,17 @@ public partial class SettingsWindow : Window
             }
         }
         comboBox.SelectedIndex = 0;
+    }
+
+    private static void SetComboContent(ComboBox comboBox, string tag, string content)
+    {
+        foreach (var item in comboBox.Items.OfType<ComboBoxItem>())
+        {
+            if ((string)item.Tag == tag)
+            {
+                item.Content = content;
+                return;
+            }
+        }
     }
 }

@@ -29,6 +29,23 @@ public static partial class TextPostProcessor
         return Regex.Replace(value, "([.,!?;:])([\\p{L}\\u4e00-\\u9fff])", "$1 $2");
     }
 
+    public static string ApplyVocabReplacements(string text)
+    {
+        return ApplyVocabReplacements(text, SettingsStore.Instance.Current.VocabularyReplacements);
+    }
+
+    public static string ApplyVocabReplacements(
+        string text,
+        IReadOnlyList<(string Wrong, string Right)> replacements)
+    {
+        var value = text;
+        foreach (var (wrong, right) in replacements)
+        {
+            value = value.Replace(wrong, right, StringComparison.Ordinal);
+        }
+        return value;
+    }
+
     public static bool IsVocabEcho(string text, IReadOnlyList<string> terms)
     {
         if (string.IsNullOrWhiteSpace(text)) return false;

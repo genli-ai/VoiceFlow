@@ -140,7 +140,8 @@ public sealed class DictationController
         string rawText;
         try
         {
-            rawText = TextPostProcessor.CleanTranscript(await _speechEngine.TranscribeAsync(samples));
+            rawText = TextPostProcessor.ApplyVocabReplacements(
+                TextPostProcessor.CleanTranscript(await _speechEngine.TranscribeAsync(samples)));
             if (TextPostProcessor.IsVocabEcho(rawText, SettingsStore.Instance.Current.VocabularyTerms))
             {
                 rawText = "";
@@ -283,7 +284,7 @@ public sealed class DictationController
 
     private async Task DeliverAsync(string raw, string finalText, string note, bool warning = false)
     {
-        var text = TextPostProcessor.FixMixedPunctuation(finalText);
+        var text = TextPostProcessor.ApplyVocabReplacements(TextPostProcessor.FixMixedPunctuation(finalText));
         HistoryStore.Instance.Add(raw, text);
         SetPhase(Phase.Idle);
         var outcome = await TextInserter.InsertAsync(text, _targetWindow);
@@ -302,7 +303,7 @@ public sealed class DictationController
 
     private void CopyToClipboard(string raw, string result, string note)
     {
-        var text = TextPostProcessor.FixMixedPunctuation(result);
+        var text = TextPostProcessor.ApplyVocabReplacements(TextPostProcessor.FixMixedPunctuation(result));
         HistoryStore.Instance.Add(raw, text);
         TextInserter.SetClipboardText(text);
         SetPhase(Phase.Idle);

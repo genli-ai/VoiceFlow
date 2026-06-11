@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Forms = System.Windows.Forms;
 
 namespace MicType.Win.Views;
 
@@ -65,7 +66,7 @@ public partial class OverlayWindow : Window
 
     private void Position()
     {
-        var area = SystemParameters.WorkArea;
+        var area = Forms.Screen.FromPoint(Forms.Cursor.Position).WorkingArea;
         Left = area.Left + (area.Width - Width) / 2;
         Top = area.Bottom - Height - 28;
     }

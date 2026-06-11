@@ -144,7 +144,7 @@ public static class AgentService
         return "\n\n[格式硬性要求：按完整邮件格式输出——第一行称呼；空一行；正文分段；空一行；结尾敬语；最后一行署名。署名占位符必须跟随邮件正文的语言：中文邮件写【你的名字】，英文邮件写 [Your Name]。不输出主题行，除非用户明确要求。若用户明确要求不用邮件格式，则按用户要求执行。]";
     }
 
-    private static (SelectionAction? Action, string? Body) ParseSelectionResult(string result)
+    public static (SelectionAction? Action, string? Body) ParseSelectionResult(string result)
     {
         var normalized = result.Replace("\r\n", "\n");
         var lines = normalized.Split('\n').ToList();
