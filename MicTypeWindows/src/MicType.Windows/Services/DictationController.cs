@@ -410,7 +410,7 @@ public sealed class DictationController
         var copied = !string.IsNullOrWhiteSpace(pending) &&
                      await TextInserter.SetClipboardTextAsync(pending);
         SetPhase(Phase.Idle);
-        Application.Current.Dispatcher.BeginInvoke(() =>
+        _ = Application.Current.Dispatcher.BeginInvoke(() =>
         {
             _overlay.FlashError(copied
                 ? L10n.Tr("处理超时，结果已复制到剪贴板", "Processing timed out; result copied to clipboard")
