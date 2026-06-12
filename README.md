@@ -132,12 +132,13 @@ MicType/
 └── Package.resolved               # Locked dependency versions
 
 scripts/                       # Repair tools and tokenizer generator
-MicTypeWindows/                # Windows port (C# / .NET, work in progress)
+MicTypeWindows/                # Windows port (C# / .NET, public beta)
 Install MicType.command       # One-click installer (build from source)
 Uninstall MicType.command     # Uninstaller
 ```
 
-> 🚧 A **Windows port** is in early development in [MicTypeWindows/](MicTypeWindows/) — not usable yet. / **Windows 版**正在 [MicTypeWindows/](MicTypeWindows/) 子目录开发中，尚不可用。
+> 🪟 **Windows (public beta):** download `MicType-{version}-win-x64.zip` from [Releases](https://github.com/genli-ai/MicType/releases/latest) — local SenseVoice recognition, tap Right Ctrl to dictate. Windows 10 22H2+ / 11 x64; first run downloads a ~250 MB speech model in Settings; SmartScreen will warn (unsigned beta) — More info → Run anyway. Upgrades are one click via Settings → About → Check for Updates. Details: [MicTypeWindows/](MicTypeWindows/)
+> **Windows 版（公开测试）**：从 [Releases](https://github.com/genli-ai/MicType/releases/latest) 下载 `MicType-{版本}-win-x64.zip`——本地 SenseVoice 识别，轻点右 Ctrl 听写。Win10 22H2+/11 x64；首次在设置里下载约 250MB 识别模型；SmartScreen 拦截时点「更多信息 → 仍要运行」。之后升级在 设置 → 关于 → 检查更新 一键完成。
 
 ## Credits and License
 
