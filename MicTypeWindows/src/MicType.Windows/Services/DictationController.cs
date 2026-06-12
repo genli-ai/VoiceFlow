@@ -11,15 +11,18 @@ public sealed class DictationController
     private readonly AudioRecorder _recorder = new();
     private readonly ISpeechEngine _speechEngine;
     private readonly OverlayWindow _overlay;
+    private readonly ProcessingWatchdog _processingWatchdog;
     private IntPtr _targetWindow;
     private string? _targetProcessName;
     private string? _targetSelection;
+    private string? _pendingDeliverText;
     private bool _skillSession;
 
     public DictationController(ISpeechEngine speechEngine, OverlayWindow overlay)
     {
         _speechEngine = speechEngine;
         _overlay = overlay;
+        _processingWatchdog = new ProcessingWatchdog(TimeSpan.FromSeconds(30), () => Phase, OnProcessingTimeoutAsync);
     }
 
     public event Action<Phase>? PhaseChanged;
@@ -260,10 +263,10 @@ public sealed class DictationController
                 await DeliverAsync(raw, result.Text, L10n.Tr("已输入指令结果", "Command result inserted"));
                 break;
             case SelectionAction.Reply:
-                CopyToClipboard(raw, result.Text, L10n.Tr("回复草稿已复制——点到输入框按 Ctrl+V", "Reply draft copied — click the input field and press Ctrl+V"));
+                await CopyToClipboardAsync(raw, result.Text, L10n.Tr("回复草稿已复制——点到输入框按 Ctrl+V", "Reply draft copied — click the input field and press Ctrl+V"));
                 break;
             default:
-                CopyToClipboard(raw, result.Text, L10n.Tr("结果已复制到剪贴板——按 Ctrl+V 粘贴", "Result copied — press Ctrl+V to paste"));
+                await CopyToClipboardAsync(raw, result.Text, L10n.Tr("结果已复制到剪贴板——按 Ctrl+V 粘贴", "Result copied — press Ctrl+V to paste"));
                 break;
         }
     }
@@ -289,7 +292,7 @@ public sealed class DictationController
         if (result.Text is not null)
         {
             Log.Info($"Reply draft succeeded resultChars={result.Text.Length}");
-            CopyToClipboard(raw, result.Text, L10n.Tr("回复草稿已复制——点到输入框按 Ctrl+V", "Reply draft copied — click the input field and press Ctrl+V"));
+            await CopyToClipboardAsync(raw, result.Text, L10n.Tr("回复草稿已复制——点到输入框按 Ctrl+V", "Reply draft copied — click the input field and press Ctrl+V"));
         }
         else
         {
@@ -301,33 +304,79 @@ public sealed class DictationController
     private async Task DeliverAsync(string raw, string finalText, string note, bool warning = false)
     {
         var text = TextPostProcessor.ApplyVocabReplacements(TextPostProcessor.FixMixedPunctuation(finalText));
-        HistoryStore.Instance.Add(raw, text);
-        SetPhase(Phase.Idle);
-        var outcome = await TextInserter.InsertAsync(text, _targetWindow);
-        if (outcome == InsertOutcome.Pasted)
+        _pendingDeliverText = text;
+        Log.Info($"Deliver enter rawChars={raw.Length} finalChars={text.Length} targetProcess={_targetProcessName ?? "unknown"}");
+        try
         {
-            Log.Info($"Deliver pasted rawChars={raw.Length} finalChars={text.Length} warning={warning}");
-            if (warning) _overlay.FlashError(note);
-            else _overlay.FlashSuccess(note);
-            Sounds.PlaySuccess();
+            HistoryStore.Instance.Add(raw, text);
+            var result = await TextInserter.InsertAsync(text, _targetWindow, _targetProcessName);
+            Log.Info(
+                "Deliver insert result " +
+                $"outcome={result.Outcome} clipboardReady={result.ClipboardReady} error={result.Error ?? ""}");
+
+            if (result.Outcome == InsertOutcome.Pasted)
+            {
+                Log.Info($"Deliver pasted rawChars={raw.Length} finalChars={text.Length} warning={warning}");
+                if (warning) _overlay.FlashError(note);
+                else _overlay.FlashSuccess(note);
+                Sounds.PlaySuccess();
+            }
+            else
+            {
+                Log.Warn($"Deliver clipboard fallback rawChars={raw.Length} finalChars={text.Length} outcome={result.Outcome}");
+                _overlay.FlashError(result.ClipboardReady
+                    ? L10n.Tr("已复制到剪贴板——按 Ctrl+V 粘贴", "Copied to clipboard — press Ctrl+V to paste")
+                    : L10n.Tr("投递失败，请重试", "Insert failed — please try again"));
+                Sounds.PlayError();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Log.Warn($"Deliver fell back to clipboard rawChars={raw.Length} finalChars={text.Length}");
-            _overlay.FlashError(L10n.Tr("窗口已切换，文本已复制到剪贴板——按 Ctrl+V 粘贴", "Window changed — text copied to clipboard, press Ctrl+V to paste"));
+            Log.Error(ex, "Deliver failed");
+            var copied = await TextInserter.SetClipboardTextAsync(text);
+            _overlay.FlashError(copied
+                ? L10n.Tr("投递异常，结果已复制到剪贴板", "Insert failed; result copied to clipboard")
+                : L10n.Tr("投递异常，请重试", "Insert failed — please try again"));
             Sounds.PlayError();
+        }
+        finally
+        {
+            _pendingDeliverText = null;
+            SetPhase(Phase.Idle);
         }
     }
 
-    private void CopyToClipboard(string raw, string result, string note)
+    private async Task CopyToClipboardAsync(string raw, string result, string note)
     {
         var text = TextPostProcessor.ApplyVocabReplacements(TextPostProcessor.FixMixedPunctuation(result));
-        HistoryStore.Instance.Add(raw, text);
-        TextInserter.SetClipboardText(text);
-        SetPhase(Phase.Idle);
-        Log.Info($"Copied result to clipboard rawChars={raw.Length} finalChars={text.Length}");
-        _overlay.FlashSuccess(note);
-        Sounds.PlaySuccess();
+        _pendingDeliverText = text;
+        try
+        {
+            HistoryStore.Instance.Add(raw, text);
+            var copied = await TextInserter.SetClipboardTextAsync(text);
+            Log.Info($"Copied result to clipboard rawChars={raw.Length} finalChars={text.Length} copied={copied}");
+            if (copied)
+            {
+                _overlay.FlashSuccess(note);
+                Sounds.PlaySuccess();
+            }
+            else
+            {
+                _overlay.FlashError(L10n.Tr("复制失败，请重试", "Copy failed — please try again"));
+                Sounds.PlayError();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Copy result to clipboard failed");
+            _overlay.FlashError(L10n.Tr("复制异常，请重试", "Copy failed — please try again"));
+            Sounds.PlayError();
+        }
+        finally
+        {
+            _pendingDeliverText = null;
+            SetPhase(Phase.Idle);
+        }
     }
 
     private void Fail(string message)
@@ -341,7 +390,33 @@ public sealed class DictationController
     private void SetPhase(Phase phase)
     {
         Phase = phase;
-        Application.Current.Dispatcher.Invoke(() => PhaseChanged?.Invoke(phase));
+        if (phase == Phase.Processing) _processingWatchdog.Arm();
+        else _processingWatchdog.Disarm();
+
+        var dispatcher = Application.Current.Dispatcher;
+        if (dispatcher.CheckAccess())
+        {
+            PhaseChanged?.Invoke(phase);
+        }
+        else
+        {
+            dispatcher.BeginInvoke(() => PhaseChanged?.Invoke(phase));
+        }
+    }
+
+    private async Task OnProcessingTimeoutAsync()
+    {
+        var pending = _pendingDeliverText;
+        var copied = !string.IsNullOrWhiteSpace(pending) &&
+                     await TextInserter.SetClipboardTextAsync(pending);
+        SetPhase(Phase.Idle);
+        Application.Current.Dispatcher.BeginInvoke(() =>
+        {
+            _overlay.FlashError(copied
+                ? L10n.Tr("处理超时，结果已复制到剪贴板", "Processing timed out; result copied to clipboard")
+                : L10n.Tr("处理超时", "Processing timed out"));
+            Sounds.PlayError();
+        });
     }
 
     private static bool IsPoorSelectionApp(string? processName)

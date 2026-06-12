@@ -1,4 +1,3 @@
-using System.Windows;
 using System.Windows.Automation;
 using MicType.Win.Core;
 
@@ -30,32 +29,20 @@ public static class SelectionReader
         var direct = ReadSelectedText();
         if (!string.IsNullOrWhiteSpace(direct)) return direct;
 
-        var oldText = TextInserter.GetClipboardText();
+        var oldText = await TextInserter.GetClipboardTextAsync();
         TextInserter.SendCtrlC();
         await Task.Delay(350);
 
-        string? copied = null;
-        await Application.Current.Dispatcher.InvokeAsync(() =>
+        var copied = await TextInserter.GetClipboardTextAsync();
+        if (oldText is null)
         {
-            if (Clipboard.ContainsText())
-            {
-                var text = Clipboard.GetText();
-                if (!string.IsNullOrWhiteSpace(text))
-                {
-                    copied = text;
-                }
-            }
+            await TextInserter.ClearClipboardAsync();
+        }
+        else
+        {
+            await TextInserter.SetClipboardTextAsync(oldText);
+        }
 
-            if (oldText is null)
-            {
-                Clipboard.Clear();
-            }
-            else
-            {
-                Clipboard.SetText(oldText);
-            }
-        });
-
-        return copied;
+        return string.IsNullOrWhiteSpace(copied) ? null : copied;
     }
 }
