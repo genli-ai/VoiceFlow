@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        Log.startup()
 
         setupStatusItem()
 
@@ -136,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsItem.keyEquivalent = ","
         settingsItem.keyEquivalentModifierMask = .command
         menu.addItem(settingsItem)
+        menu.addItem(makeItem(tr("打开日志文件夹", "Open Logs Folder"), #selector(openLogsFolder)))
 
         menu.addItem(.separator())
 
@@ -184,6 +186,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openSettings() {
         SettingsWindowController.shared.show()
+    }
+
+    @objc private func openLogsFolder() {
+        Log.info("Open logs folder")
+        NSWorkspace.shared.open(Log.logsDirectory)
     }
 
     @objc private func quit() {

@@ -55,6 +55,7 @@ final class DictationController {
 
     func cancel() {
         guard phase == .recording else { return }
+        Log.info("Recording cancelled by user")
         _ = recorder.stop()
         skillSession = false
         phase = .idle
@@ -133,6 +134,7 @@ final class DictationController {
                 return
             }
             self.phase = .recording
+            Log.info("Recording start skill=\(skill) target=\(self.targetBundleID)")
             self.overlay.showRecording(label: skill ? tr("正在听指令…", "Listening for command…")
                                                     : tr("正在听…", "Listening…"))
             Sounds.playStart()
@@ -146,6 +148,7 @@ final class DictationController {
 
         // 太短当作误触
         guard duration >= 0.4 else {
+            Log.info("Recording stop discarded duration=\(String(format: "%.2f", duration))s (<0.4s)")
             phase = .idle
             overlay.hide()
             return
@@ -154,11 +157,13 @@ final class DictationController {
         // 几乎无声（误触或没说话）：不送识别——空音频会诱发模型把热词上下文"复读"成识别结果
         let peak = samples.reduce(0) { max($0, abs($1)) }
         guard peak >= 0.012 else {
+            Log.info("Recording stop silence-gated duration=\(String(format: "%.2f", duration))s peak=\(String(format: "%.4f", peak))")
             phase = .idle
             overlay.flashError(tr("没有听到内容", "Nothing heard"))
             return
         }
 
+        Log.info("Recording stop duration=\(String(format: "%.2f", duration))s peak=\(String(format: "%.4f", peak))")
         phase = .processing
         overlay.showProcessing(tr("识别中…", "Transcribing…"))
         let isColdStart = !QwenEngine.shared.isModelReady
@@ -167,10 +172,12 @@ final class DictationController {
             guard let self = self else { return }
             switch result {
             case .failure(let error):
+                Log.error("Transcription failed: \(error.message)")
                 self.phase = .idle
                 self.overlay.flashError(error.message)
                 Sounds.playError()
             case .success(let transcribed):
+                Log.info("Transcription completed chars=\(transcribed.count)")
                 // 词汇表"错写=正写"硬替换：进入润色/指令之前先做确定性纠正
                 let rawText = TextPostProcessor.applyVocabReplacements(transcribed)
                 guard !rawText.isEmpty else {
@@ -332,10 +339,12 @@ final class DictationController {
         let finalText = TextPostProcessor.applyVocabReplacements(TextPostProcessor.fixMixedPunctuation(text))
         HistoryStore.shared.add(raw: raw, polished: finalText)
         phase = .idle
+        Log.info("Deliver start chars=\(finalText.count) target=\(targetBundleID)")
         TextInserter.insert(finalText, targetBundleID: targetBundleID,
                             allowClipboardRestore: allowClipboardRestore,
                             conservativePaste: !allowClipboardRestore) { [weak self] outcome in
             guard let self = self else { return }
+            Log.info("Deliver outcome=\(outcome == .pasted ? "pasted" : "clipboardOnly")")
             switch outcome {
             case .pasted:
                 if warning {

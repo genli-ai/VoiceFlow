@@ -130,17 +130,28 @@ final class OverlayController {
         hideGeneration += 1
         state.resetLevels()
         state.mode = .recording(label)
-        let p = ensurePanel()
-        position(p)
-        p.orderFrontRegardless()
+        present(context: "recording")
     }
 
     func showProcessing(_ label: String) {
         hideGeneration += 1
         state.mode = .processing(label)
+        present(context: "processing")
+    }
+
+    /// 统一的显示入口：定位 → 置顶 → 回读真实可见性，不可见则记 WARN 并重试一次
+    private func present(context: String) {
         let p = ensurePanel()
         position(p)
         p.orderFrontRegardless()
+        Log.overlayShown(context: context, panel: p)
+        if !p.isVisible {
+            Log.warn("Overlay \(context) not visible after orderFront — retrying")
+            p.orderOut(nil)
+            position(p)
+            p.orderFrontRegardless()
+            Log.overlayShown(context: context + "-retry", panel: p)
+        }
     }
 
     func flashSuccess(_ label: String) {
@@ -155,9 +166,7 @@ final class OverlayController {
         hideGeneration += 1
         let generation = hideGeneration
         state.mode = mode
-        let p = ensurePanel()
-        position(p)
-        p.orderFrontRegardless()
+        present(context: "flash")
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
             guard let self = self, self.hideGeneration == generation else { return }
             self.hide()

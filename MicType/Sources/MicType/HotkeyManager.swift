@@ -141,6 +141,7 @@ final class HotkeyManager {
                 let work = DispatchWorkItem { [weak self] in
                     guard let self = self, self.tapCandidate, !self.isRecording() else { return }
                     self.skillActive = true
+                    Log.info("Hotkey skill-start (hold)")
                     self.onSkillStart?()
                 }
                 holdWorkItem = work
@@ -153,8 +154,14 @@ final class HotkeyManager {
             holdWorkItem?.cancel()
             if skillActive {
                 skillActive = false
+                Log.info("Hotkey skill-end")
                 DispatchQueue.main.async { [weak self] in self?.onSkillEnd?() }
+            } else if tapCandidate, isRecording() {
+                // 录音中无论按了多久，松开一律=停止（否则长按≥0.6s 松开会"没反应"）
+                Log.info("Hotkey release-stop (recording)")
+                DispatchQueue.main.async { [weak self] in self?.onTapToggle?() }
             } else if tapCandidate, let t = pressedAt, Date().timeIntervalSince(t) < 0.6 {
+                Log.info("Hotkey tap")
                 DispatchQueue.main.async { [weak self] in self?.onTapToggle?() }
             }
             tapCandidate = false
