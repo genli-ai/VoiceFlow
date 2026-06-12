@@ -113,7 +113,12 @@ public static class TextInserter
 
             Thread.Sleep(conservativePaste ? 350 : 180);
             Log.Info("Insert SendInput Ctrl+V");
-            SendCtrlV(conservativePaste ? 120 : 30);
+            if (!SendCtrlV(conservativePaste ? 120 : 30))
+            {
+                // 粘贴按键没发出去：文本还在剪贴板，降级提示用户手动 Ctrl+V（此时绝不能恢复旧剪贴板）
+                Log.Warn("Insert clipboard fallback; SendInput rejected the paste keystrokes");
+                return new InsertResult(InsertOutcome.ClipboardOnly, ClipboardReady: true);
+            }
 
             if (allowClipboardRestore && SettingsStore.Instance.Current.RestoreClipboard)
             {
@@ -272,12 +277,12 @@ public static class TextInserter
         return null;
     }
 
-    private static void SendCtrlV(int holdMilliseconds)
+    private static bool SendCtrlV(int holdMilliseconds)
     {
-        SendModifiedKey(0x11, 0x56, holdMilliseconds);
+        return SendModifiedKey(0x11, 0x56, holdMilliseconds);
     }
 
-    private static void SendModifiedKey(ushort modifier, ushort key, int holdMilliseconds)
+    private static bool SendModifiedKey(ushort modifier, ushort key, int holdMilliseconds)
     {
         var inputs = new[]
         {
@@ -287,11 +292,18 @@ public static class TextInserter
             KeyboardInput(modifier, true)
         };
         var sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
+        if (sent != inputs.Length)
+        {
+            Log.Warn($"SendInput key=0x{key:X} sent={sent}/{inputs.Length} lastError={Marshal.GetLastWin32Error()}");
+            return false;
+        }
+
         Log.Info($"SendInput key=0x{key:X} sent={sent}/{inputs.Length}");
         if (holdMilliseconds > 30)
         {
             Thread.Sleep(holdMilliseconds);
         }
+        return true;
     }
 
     private static Input KeyboardInput(ushort key, bool keyUp) => new()
@@ -359,7 +371,21 @@ public static class TextInserter
     [StructLayout(LayoutKind.Explicit)]
     private struct InputUnion
     {
+        // MOUSEINPUT 是 union 里最大的成员——没有它 INPUT 在 x64 上只有 32 字节而系统要求 40，
+        // SendInput 会拒收全部输入并返回 0（真机三轮 "sent=0/4" 的根因）
+        [FieldOffset(0)] public MouseInputStruct Mi;
         [FieldOffset(0)] public KeyboardInputStruct Ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MouseInputStruct
+    {
+        public int Dx;
+        public int Dy;
+        public uint MouseData;
+        public uint DwFlags;
+        public uint Time;
+        public IntPtr DwExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential)]
