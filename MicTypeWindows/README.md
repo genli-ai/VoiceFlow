@@ -2,6 +2,16 @@
 
 This folder is the Windows implementation scaffold for MicType. It is intentionally isolated from the macOS Swift package so the two build systems do not contaminate each other.
 
+## System Requirements / 系统要求
+
+- **Windows 10 22H2 or Windows 11, 64-bit (x64)** — matches the .NET 8 support matrix; verified on a real Windows 10 22H2 (19045) machine. Windows on ARM is untested and unsupported for now.
+- **RAM:** 8 GB+ recommended (the SenseVoice model takes a few hundred MB when loaded).
+- **Disk:** ~1 GB (app ~190 MB + speech model ~250 MB).
+- **Mic + network:** microphone required; network needed once to download the speech model (~250 MB) and whenever AI polish / voice commands call your GPT/DeepSeek API. Plain dictation runs fully offline after the model is installed.
+- **Known dependency:** onnxruntime requires the Microsoft **VC++ 2015-2022 redistributable** — present on almost every machine; on a pristine system a "missing DLL" error means installing it once.
+
+中文：Windows 10 22H2 / Windows 11（64 位 x64）；建议内存 8GB+；磁盘约 1GB（含 250MB 识别模型）；需要麦克风，首次联网下载模型，本地听写下线后完全离线；AI 润色/指令需联网 + API Key。极干净的系统若报缺 DLL，安装一次微软 VC++ 2015-2022 运行库即可。
+
 ## Current State
 
 - .NET 8 + WPF tray app scaffold
