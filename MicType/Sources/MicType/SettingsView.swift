@@ -496,6 +496,8 @@ private struct KeyStatusBadge: View {
 
 private struct AboutTab: View {
     @ObservedObject private var l10n = L10n.shared
+    @State private var updateStatus = ""
+    @State private var checkingUpdate = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -504,14 +506,29 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.2.11 · Qwen3-ASR 引擎 + 语音指令",
-                    "Version 3.2.11 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 3.2.12 · Qwen3-ASR 引擎 + 语音指令",
+                    "Version 3.2.12 · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .font(.callout)
+            HStack(spacing: 8) {
+                Button(checkingUpdate ? tr("检查中…", "Checking…") : tr("检查更新", "Check for Updates")) {
+                    runUpdateCheck()
+                }
+                .disabled(checkingUpdate)
+                Button(tr("发布页", "Releases")) {
+                    NSWorkspace.shared.open(UpdateChecker.releasesPage)
+                }
+            }
+            if !updateStatus.isEmpty {
+                Text(updateStatus)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             Divider().padding(.horizontal, 60)
             VStack(spacing: 4) {
                 Text(tr("隐私：录音和语音识别完全在本机进行。",
@@ -524,5 +541,26 @@ private struct AboutTab: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+        .onChange(of: l10n.language) { _, _ in
+            updateStatus = ""  // 一次性状态文字是语言快照，切语言即清空
+        }
+    }
+
+    private func runUpdateCheck() {
+        checkingUpdate = true
+        updateStatus = tr("正在检查 GitHub 上的最新版本…", "Checking the latest release on GitHub…")
+        UpdateChecker.checkAndDownload { result in
+            checkingUpdate = false
+            switch result {
+            case .upToDate(let v):
+                updateStatus = tr("已是最新版本（\(v)）", "You're up to date (\(v))")
+            case .downloaded(let v, _):
+                updateStatus = tr("新版本 \(v) 已下载到「下载」文件夹（已在 Finder 中选中）——解压后把 MicType.app 拖进「应用程序」替换，重新打开即完成升级",
+                                  "Version \(v) downloaded to your Downloads folder (revealed in Finder) — unzip, drag MicType.app into Applications to replace, then relaunch")
+            case .failed(let message):
+                updateStatus = tr("检查失败：\(message)。可点「发布页」手动下载",
+                                  "Check failed: \(message). Use the Releases button to download manually")
+            }
+        }
     }
 }
