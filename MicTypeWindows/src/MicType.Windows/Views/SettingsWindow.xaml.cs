@@ -86,6 +86,7 @@ public partial class SettingsWindow : Window
             "Windows goal: tap Right Ctrl to dictate, hold it to command AI. Audio and local recognition stay on device; text can be polished or executed through your GPT / DeepSeek API.\n\nThis build uses local sherpa-onnx + SenseVoice recognition.");
         SaveButton.Content = L10n.Tr("保存设置", "Save Settings");
         VersionText.Text = L10n.Tr("版本 ", "Version ") + UpdateChecker.CurrentVersion + " · sherpa-onnx SenseVoice";
+        BuildAuthorLine();
         CheckUpdateButton.Content = L10n.Tr("检查更新", "Check for Updates");
         ReleasesButton.Content = L10n.Tr("发布页", "Releases");
         ApplyModelState(_modelDownloader.CurrentState);
@@ -134,6 +135,26 @@ public partial class SettingsWindow : Window
         {
             CheckUpdateButton.IsEnabled = true;
         }
+    }
+
+    private void BuildAuthorLine()
+    {
+        AuthorText.Inlines.Clear();
+        AuthorText.Inlines.Add(new System.Windows.Documents.Run(L10n.Tr("作者：Gen · ", "Built by Gen · ")));
+        AuthorText.Inlines.Add(MakeLink("genli-ai.github.io/portfolio", "https://genli-ai.github.io/portfolio/"));
+        AuthorText.Inlines.Add(new System.Windows.Documents.Run(" · "));
+        AuthorText.Inlines.Add(MakeLink("ligen.thu@gmail.com", "mailto:ligen.thu@gmail.com"));
+    }
+
+    private static System.Windows.Documents.Hyperlink MakeLink(string text, string uri)
+    {
+        var link = new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run(text))
+        {
+            NavigateUri = new Uri(uri)
+        };
+        link.RequestNavigate += (_, e) =>
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.Uri.ToString()) { UseShellExecute = true });
+        return link;
     }
 
     private void OnOpenReleases(object sender, RoutedEventArgs e)

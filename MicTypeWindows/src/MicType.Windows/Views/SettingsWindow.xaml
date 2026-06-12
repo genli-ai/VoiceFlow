@@ -98,6 +98,7 @@
                     </StackPanel>
                     <TextBlock x:Name="UpdateStatusText" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="Gray" />
                     <TextBlock x:Name="AboutText" TextWrapping="Wrap" Margin="0,14,0,0" />
+                    <TextBlock x:Name="AuthorText" Margin="0,14,0,0" />
                 </StackPanel>
             </TabItem>
         </TabControl>

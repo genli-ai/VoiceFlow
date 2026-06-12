@@ -506,8 +506,8 @@ private struct AboutTab: View {
                 .foregroundColor(.accentColor)
             Text("MicType")
                 .font(.title2.bold())
-            Text(tr("版本 3.2.13 · Qwen3-ASR 引擎 + 语音指令",
-                    "Version 3.2.13 · Qwen3-ASR engine + voice commands"))
+            Text(tr("版本 \(UpdateChecker.currentVersion) · Qwen3-ASR 引擎 + 语音指令",
+                    "Version \(UpdateChecker.currentVersion) · Qwen3-ASR engine + voice commands"))
                 .foregroundColor(.secondary)
             Text(tr("本地 Qwen3-ASR 语音识别 + GPT / DeepSeek 智能润色\n轻点快捷键语音输入；按住快捷键说指令——改写、回复、草拟、翻译。",
                     "On-device Qwen3-ASR speech recognition + GPT / DeepSeek polish.\nTap the hotkey to dictate; hold it to speak commands — rewrite, reply, draft, translate."))
@@ -529,6 +529,14 @@ private struct AboutTab: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
             }
+            HStack(spacing: 10) {
+                Text(tr("作者：Gen", "Built by Gen"))
+                Link("genli-ai.github.io/portfolio",
+                     destination: URL(string: "https://genli-ai.github.io/portfolio/")!)
+                Link("ligen.thu@gmail.com",
+                     destination: URL(string: "mailto:ligen.thu@gmail.com")!)
+            }
+            .font(.caption)
             Divider().padding(.horizontal, 60)
             VStack(spacing: 4) {
                 Text(tr("隐私：录音和语音识别完全在本机进行。",
