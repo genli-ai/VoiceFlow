@@ -104,7 +104,19 @@ fi
 
 find "$APP" \( -name "._*" -o -name ".DS_Store" \) -delete 2>/dev/null || true
 xattr -rc "$APP" 2>/dev/null || true
-codesign --force -s - "$APP" || fail "$(t "签名失败" "Code signing failed")"
+# 签名身份：优先用稳定的 Developer ID。macOS 把「辅助功能」授权绑定到签名身份，
+# ad-hoc(-s -) 每次构建身份都变 → 升级后旧授权失效，必须到系统设置里删了重加。
+# Developer ID 身份稳定 → 同身份升级授权自动延续。无证书才退回 ad-hoc。
+SIGN_ID=$(security find-identity -v -p codesigning 2>/dev/null | grep -m1 "Developer ID Application" | sed -E 's/^[^"]*"([^"]*)".*$/\1/')
+if [ -n "$SIGN_ID" ]; then
+    codesign --force -s "$SIGN_ID" "$APP" || fail "$(t "签名失败" "Code signing failed")"
+    STABLE_SIGN=1
+    echo "  $(t "已用 Developer ID 签名，授权将跨升级保留" "Signed with Developer ID — authorization persists across updates")"
+else
+    codesign --force -s - "$APP" || fail "$(t "签名失败" "Code signing failed")"
+    STABLE_SIGN=0
+    echo "  $(t "无 Developer ID 证书，ad-hoc 签名（每次升级需重新授权辅助功能）" "No Developer ID cert — ad-hoc signed (re-grant Accessibility after each update)")"
+fi
 codesign --verify --deep "$APP" || fail "$(t "签名校验未通过" "Signature verification failed")"
 green "  ✓ $(t "打包完成" "Packaging complete")"
 
@@ -122,7 +134,11 @@ if ! ditto "$APP" "$DEST" 2>/dev/null; then
 fi
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
 touch "$DEST" 2>/dev/null || true
-tccutil reset Accessibility com.ligen.mictype >/dev/null 2>&1 || true
+# 仅 ad-hoc 签名（身份不稳定、旧授权失效又看似还在）才清掉强制重授；
+# Developer ID 身份稳定，reset 反而会白白丢掉用户已有授权。
+if [ "${STABLE_SIGN:-0}" != "1" ]; then
+    tccutil reset Accessibility com.ligen.mictype >/dev/null 2>&1 || true
+fi
 green "  ✓ $(t "已安装：" "Installed: ")$DEST"
 
 open "$DEST"
@@ -130,7 +146,11 @@ open "$DEST"
 echo
 bold "🎉 $(t "MicType 安装完成！接下来：" "MicType installed! Next steps:")"
 echo
-echo "  1. $(t "重新授权【辅助功能】：系统设置 → 隐私与安全性 → 辅助功能（已有条目先删再加）" "Re-grant Accessibility: System Settings → Privacy & Security → Accessibility (remove the old entry, then add again)")"
+if [ "${STABLE_SIGN:-0}" = "1" ]; then
+    echo "  1. $(t "授权【辅助功能】：系统设置 → 隐私与安全性 → 辅助功能（从旧 ad-hoc 版切过来需先删旧条目再加一次；之后升级自动保留）" "Grant Accessibility: System Settings → Privacy & Security → Accessibility (upgrading from an old ad-hoc build: remove the old entry, add once; future updates keep it)")"
+else
+    echo "  1. $(t "重新授权【辅助功能】：系统设置 → 隐私与安全性 → 辅助功能（已有条目先删再加）" "Re-grant Accessibility: System Settings → Privacy & Security → Accessibility (remove the old entry, then add again)")"
+fi
 echo "  2. $(t "首次使用：设置 → 识别 → 下载模型（约 860MB，一次性）" "First run: Settings → Recognition → Download Model (~860 MB, one-time)")"
 echo "  3. $(t "轻点右⌥听写；按住右⌥说指令（改写/回复/草拟/翻译）" "Tap Right-Option to dictate; hold it to speak commands (rewrite/reply/draft/translate)")"
 echo

@@ -102,7 +102,14 @@ public sealed class SettingsStore
 {
     public static SettingsStore Instance { get; } = new();
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    // 懒加载——绝不能用 static readonly 字段初始化器。静态字段按【文本声明顺序】初始化，
+    // 而 Instance（声明在前）的构造函数会调用 Load() 用到 JsonOptions；若用字段，此刻
+    // JsonOptions 尚未轮到初始化、值为 null，Deserialize(json, null) 退回默认选项（不含
+    // lenient/string 枚举转换器），于是 Save() 写出的字符串枚举值（如 "Zh"）下次启动 Load
+    // 时直接抛 JsonException → 设置被判损坏重置（每次启动都"保存不上"）。属性懒加载与声明
+    // 顺序无关，首次访问即构建，故不会再踩这个坑。
+    private static JsonSerializerOptions? _jsonOptions;
+    private static JsonSerializerOptions JsonOptions => _jsonOptions ??= new JsonSerializerOptions
     {
         WriteIndented = true,
         Converters =

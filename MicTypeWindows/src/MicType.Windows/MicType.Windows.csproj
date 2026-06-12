@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>3.2.15</Version>
+    <Version>3.2.16</Version>
   </PropertyGroup>
 
   <ItemGroup>
