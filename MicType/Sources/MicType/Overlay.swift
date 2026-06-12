@@ -139,19 +139,23 @@ final class OverlayController {
         present(context: "processing")
     }
 
-    /// 统一的显示入口：定位 → 置顶 → 回读真实可见性，不可见则记 WARN 并重试一次
+    /// 统一的显示入口：定位 → 置顶 → 回读真实状态。
+    /// 3.2.13：不只查 isVisible，还查 isOnActiveSpace——panel 的 Space 关联会偶发损坏
+    /// （visible=true 但挂在别的桌面空间，用户看不见，2026-06-12 日志实锤）。
+    /// 任一不健康就整个重建 panel：新建的 panel 必然落在当前活跃 Space。
     private func present(context: String) {
-        let p = ensurePanel()
+        var p = ensurePanel()
         position(p)
         p.orderFrontRegardless()
-        Log.overlayShown(context: context, panel: p)
-        if !p.isVisible {
-            Log.warn("Overlay \(context) not visible after orderFront — retrying")
+        if !p.isVisible || !p.isOnActiveSpace {
+            Log.warn("Overlay \(context) unhealthy (visible=\(p.isVisible) onActiveSpace=\(p.isOnActiveSpace)) — rebuilding panel")
             p.orderOut(nil)
+            panel = nil
+            p = ensurePanel()
             position(p)
             p.orderFrontRegardless()
-            Log.overlayShown(context: context + "-retry", panel: p)
         }
+        Log.overlayShown(context: context, panel: p)
     }
 
     func flashSuccess(_ label: String) {

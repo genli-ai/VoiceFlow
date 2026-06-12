@@ -193,7 +193,11 @@ final class Settings {
     }
 
     var openaiBaseURL: String {
-        get { d.string(forKey: SettingsKeys.openaiBaseURL) ?? "https://api.openai.com/v1" }
+        get {
+            // 被清空保存过也回退默认——Base URL 永远自动有值，用户只在自定义网关时才需要改
+            let v = d.string(forKey: SettingsKeys.openaiBaseURL)?.trimmingCharacters(in: .whitespaces) ?? ""
+            return v.isEmpty ? "https://api.openai.com/v1" : v
+        }
         set { d.set(newValue, forKey: SettingsKeys.openaiBaseURL) }
     }
 
@@ -253,7 +257,10 @@ final class Settings {
     }
 
     var deepseekBaseURL: String {
-        get { d.string(forKey: SettingsKeys.deepseekBaseURL) ?? LLMProvider.deepseek.defaultBaseURL }
+        get {
+            let v = d.string(forKey: SettingsKeys.deepseekBaseURL)?.trimmingCharacters(in: .whitespaces) ?? ""
+            return v.isEmpty ? LLMProvider.deepseek.defaultBaseURL : v
+        }
         set { d.set(newValue, forKey: SettingsKeys.deepseekBaseURL) }
     }
 

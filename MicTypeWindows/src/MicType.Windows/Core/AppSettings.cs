@@ -30,7 +30,16 @@ public sealed class AppSettings
     public string CustomPolishRules { get; set; } = "";
 
     [JsonIgnore]
-    public string CurrentBaseUrl => LlmProvider == LlmProvider.OpenAi ? OpenAiBaseUrl : DeepSeekBaseUrl;
+    public string CurrentBaseUrl
+    {
+        get
+        {
+            // 被清空也回退官方默认——Base URL 永远自动有值
+            var value = (LlmProvider == LlmProvider.OpenAi ? OpenAiBaseUrl : DeepSeekBaseUrl)?.Trim();
+            if (!string.IsNullOrEmpty(value)) return value;
+            return LlmProvider == LlmProvider.OpenAi ? "https://api.openai.com/v1" : "https://api.deepseek.com";
+        }
+    }
 
     [JsonIgnore]
     public string CurrentPolishModel => LlmProvider == LlmProvider.OpenAi ? OpenAiPolishModel : DeepSeekPolishModel;
