@@ -12,9 +12,12 @@ public sealed class GlobalHotkeyManager : IDisposable
     private const int WmSysKeyDown = 0x0104;
     private const int WmSysKeyUp = 0x0105;
     private const int VkEscape = 0x1B;
+    private const uint WmQuit = 0x0012;
 
     private readonly LowLevelKeyboardProc _proc;
     private IntPtr _hookId;
+    private Thread? _hookThread;
+    private uint _hookThreadId;
     private readonly HashSet<int> _pressedKeys = [];
     private DateTimeOffset? _pressedAt;
     private bool _tapCandidate;
@@ -35,18 +38,50 @@ public sealed class GlobalHotkeyManager : IDisposable
     public void Start()
     {
         Stop();
-        using var process = Process.GetCurrentProcess();
-        using var module = process.MainModule;
-        _hookId = SetWindowsHookEx(WhKeyboardLl, _proc, GetModuleHandle(module?.ModuleName), 0);
+        // 钩子装在专用线程：WH_KEYBOARD_LL 回调经由安装线程的消息泵派发，
+        // 装在 UI 线程时 UI 一卡顿回调就超时、钩子被系统静默卸载（真机"热键时灵时不灵"的根因）。
+        // 专用线程除了泵消息什么都不做，永远不卡。
+        _hookThread = new Thread(HookThreadMain)
+        {
+            IsBackground = true,
+            Name = "MicType Keyboard Hook"
+        };
+        _hookThread.Start();
     }
 
-    public void Stop()
+    private void HookThreadMain()
     {
+        _hookThreadId = GetCurrentThreadId();
+        using (var process = Process.GetCurrentProcess())
+        using (var module = process.MainModule)
+        {
+            _hookId = SetWindowsHookEx(WhKeyboardLl, _proc, GetModuleHandle(module?.ModuleName), 0);
+        }
+        Log.Info($"Keyboard hook installed ok={_hookId != IntPtr.Zero} thread={_hookThreadId}");
+
+        while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
+        {
+            TranslateMessage(ref msg);
+            DispatchMessage(ref msg);
+        }
+
         if (_hookId != IntPtr.Zero)
         {
             UnhookWindowsHookEx(_hookId);
             _hookId = IntPtr.Zero;
         }
+        Log.Info("Keyboard hook thread exiting");
+    }
+
+    public void Stop()
+    {
+        if (_hookThread is { IsAlive: true } && _hookThreadId != 0)
+        {
+            PostThreadMessage(_hookThreadId, WmQuit, UIntPtr.Zero, IntPtr.Zero);
+            _hookThread.Join(1000);
+        }
+        _hookThread = null;
+        _hookThreadId = 0;
         _holdTimer?.Dispose();
         _holdTimer = null;
     }
@@ -168,4 +203,31 @@ public sealed class GlobalHotkeyManager : IDisposable
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMessage
+    {
+        public IntPtr Hwnd;
+        public uint Message;
+        public UIntPtr WParam;
+        public IntPtr LParam;
+        public uint Time;
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int GetMessage(out NativeMessage lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+    [DllImport("user32.dll")]
+    private static extern bool TranslateMessage(ref NativeMessage lpMsg);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr DispatchMessage(ref NativeMessage lpMsg);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool PostThreadMessage(uint idThread, uint msg, UIntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 }

@@ -124,11 +124,24 @@ public partial class SettingsWindow : Window
 
     private void OnSaveKey(object sender, RoutedEventArgs e)
     {
-        SaveUiIntoSettings();
-        CredentialStore.Save(Settings.CurrentCredentialTarget, ApiKeyBox.Password);
-        TestResultText.Text = CredentialStore.Load(Settings.CurrentCredentialTarget) is null
-            ? L10n.Tr("已清空", "Cleared")
-            : L10n.Tr("已保存 Key ✓", "Key saved ✓");
+        try
+        {
+            SaveUiIntoSettings();
+            if (string.IsNullOrWhiteSpace(ApiKeyBox.Password))
+            {
+                TestResultText.Text = L10n.Tr("Key 框为空——已存的 Key 未改动", "Key box is empty — stored key unchanged");
+                return;
+            }
+            CredentialStore.Save(Settings.CurrentCredentialTarget, ApiKeyBox.Password);
+            TestResultText.Text = CredentialStore.Load(Settings.CurrentCredentialTarget) is null
+                ? L10n.Tr("保存后读取失败——请把日志发给开发者", "Saved but read-back failed — please send the logs")
+                : L10n.Tr("已保存 Key ✓", "Key saved ✓");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Save key failed");
+            TestResultText.Text = L10n.Tr("保存 Key 失败：", "Key save failed: ") + ex.Message;
+        }
     }
 
     private async void OnTestPolishModel(object sender, RoutedEventArgs e)
@@ -144,7 +157,14 @@ public partial class SettingsWindow : Window
     private async Task TestModelAsync(string model)
     {
         SaveUiIntoSettings();
-        CredentialStore.Save(Settings.CurrentCredentialTarget, ApiKeyBox.Password);
+        try
+        {
+            CredentialStore.Save(Settings.CurrentCredentialTarget, ApiKeyBox.Password);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Save key before model test failed");
+        }
         TestResultText.Text = L10n.Tr("测试中…", "Testing…");
         var result = await LlmClient.TestModelAsync(model);
         TestResultText.Text = result.Message;

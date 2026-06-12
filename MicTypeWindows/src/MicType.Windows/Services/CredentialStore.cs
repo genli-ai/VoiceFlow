@@ -1,19 +1,26 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using MicType.Win.Core;
 
 namespace MicType.Win.Services;
 
 public static class CredentialStore
 {
     private const uint CredTypeGeneric = 1;
+    private const uint CredPersistSession = 1;
     private const uint CredPersistLocalMachine = 2;
 
     public static void Save(string targetName, string secret)
     {
-        Delete(targetName);
         var trimmed = secret.Trim();
-        if (trimmed.Length == 0) return;
+        if (trimmed.Length == 0)
+        {
+            // 空输入绝不删除已存的 Key——清空必须是显式动作，不能是"框是空的"的副作用
+            Log.Info($"Credential save skipped (empty input) target={targetName} — existing key untouched");
+            return;
+        }
+        Delete(targetName);
 
         var bytes = Encoding.Unicode.GetBytes(trimmed);
         var blob = Marshal.AllocCoTaskMem(bytes.Length);
@@ -30,9 +37,20 @@ public static class CredentialStore
                 UserName = Environment.UserName
             };
 
-            if (!CredWrite(ref credential, 0))
+            if (CredWrite(ref credential, 0))
             {
-                throw new InvalidOperationException("CredWrite failed: " + Marshal.GetLastWin32Error());
+                Log.Info($"Credential saved target={targetName} persist=LocalMachine");
+            }
+            else
+            {
+                var err = Marshal.GetLastWin32Error();
+                Log.Warn($"CredWrite LocalMachine failed lastError={err} target={targetName} — retrying with Session persistence");
+                credential.Persist = CredPersistSession;
+                if (!CredWrite(ref credential, 0))
+                {
+                    throw new InvalidOperationException("CredWrite failed: " + Marshal.GetLastWin32Error());
+                }
+                Log.Warn($"Credential stored with SESSION persistence only target={targetName} — it will not survive logout; this machine restricts persisted credentials");
             }
         }
         finally

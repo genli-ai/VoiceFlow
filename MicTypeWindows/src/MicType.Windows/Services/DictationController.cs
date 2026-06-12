@@ -87,6 +87,13 @@ public sealed class DictationController
         if (Phase != Phase.Idle) return;
         _targetWindow = TextInserter.CaptureForegroundWindow();
         _targetProcessName = GetProcessNameForWindow(_targetWindow);
+        if (_targetProcessName is "explorer" or "MicType")
+        {
+            // 从托盘菜单启动时前台是任务栏/自己——别把它当投递目标，粘贴时跟随当时的前台窗口
+            Log.Info($"Captured foreground is {_targetProcessName} (tray launch?) — paste will follow the foreground at delivery time");
+            _targetWindow = IntPtr.Zero;
+            _targetProcessName = null;
+        }
         _skillSession = skill;
         _targetSelection = skill ? SelectionReader.ReadSelectedText() : null;
         Log.Info(

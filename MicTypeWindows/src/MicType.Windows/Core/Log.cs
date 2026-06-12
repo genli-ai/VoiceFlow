@@ -53,6 +53,16 @@ public static class Log
             $"provider={settings.LlmProvider} playSounds={settings.PlaySounds} restoreClipboard={settings.RestoreClipboard} " +
             $"engine={engineName} modelAvailable={modelAvailable} " +
             $"vocabularyTerms={settings.VocabularyTerms.Count} replacements={settings.VocabularyReplacements.Count}");
+        try
+        {
+            var hasOpenAi = Services.CredentialStore.Load(CredentialTargets.OpenAiApiKey) is not null;
+            var hasDeepSeek = Services.CredentialStore.Load(CredentialTargets.DeepSeekApiKey) is not null;
+            Info($"Credentials openAiKey={hasOpenAi} deepSeekKey={hasDeepSeek}");
+        }
+        catch (Exception ex)
+        {
+            Warn("Credential presence check failed: " + ex.Message);
+        }
         foreach (var display in WindowsDpi.DescribeDisplays())
         {
             Info("Display " + display);
