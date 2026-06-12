@@ -318,7 +318,7 @@ public sealed class DictationController
             if (fgName is null or "explorer" or "MicType")
             {
                 Log.Info($"Deliver foreground is {fgName ?? "unknown"} — no paste target, clipboard only");
-                CopyToClipboard(raw, finalText,
+                await CopyToClipboardAsync(raw, finalText,
                     L10n.Tr("结果已复制——点到输入框按 Ctrl+V", "Copied — click the input field and press Ctrl+V"));
                 return;
             }
