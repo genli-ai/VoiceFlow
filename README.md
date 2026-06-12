@@ -40,6 +40,18 @@ Tap is always pure dictation (what you say is what gets typed), hold is always a
 - **Bring your own model** — GPT or DeepSeek (both keys can be saved), any OpenAI-compatible endpoint. Keys live in the macOS Keychain. No key? MicType still works fully offline as a dictation tool.
 - **Bilingual UI** — English / 中文, switch instantly in Settings.
 
+## Quick Start (5 minutes)
+
+Everything downloads from one page: **[Releases · latest](https://github.com/genli-ai/MicType/releases/latest)**
+
+| | 🍎 macOS (Apple Silicon, macOS 15+) | 🪟 Windows (Win10 22H2+ / 11, x64 — beta) |
+|---|---|---|
+| **1. Download & run** | `MicType-{version}-arm64.zip` → unzip → drag `MicType.app` to Applications. If blocked: System Settings → Privacy & Security → **Open Anyway** | `MicType-{version}-win-x64.zip` → unzip → run `MicType.exe`. SmartScreen: **More info → Run anyway** |
+| **2. One-time setup** | Allow **Microphone**; enable **Accessibility** (System Settings → Privacy & Security); download the speech model in Settings → Recognition (~860 MB) | Right-click the tray icon → Settings → download the speech model (~250 MB) |
+| **3. Speak** | **Tap Right Option (⌥)** → talk → tap again. Text appears at your cursor | **Tap Right Ctrl** → talk → tap again. Text appears at your cursor |
+
+Speech recognition runs 100% on your device — audio never leaves your machine. Optional: add a GPT/DeepSeek API key in Settings to unlock AI polish and **hold-to-command** (rewrite selection / draft replies / ask anything). Upgrades: Settings → About → **Check for Updates**.
+
 ## Install
 
 Requirements: **Apple Silicon + macOS 15+**. (Building from source additionally needs full Xcode — MLX compiles Metal shaders.)
@@ -189,6 +201,18 @@ This project was designed, implemented, debugged, and refined with AI collaborat
 - **专有词汇表 = 热词**——人名、品牌、术语直接送入识别模型并参与润色纠错，是专有名词准确率的第一杠杆
 - **模型自带**——GPT 或 DeepSeek（两个 Key 可同时保存），任何 OpenAI 兼容接口均可。Key 存 macOS 钥匙串。不填 Key 也完全可用：纯离线听写
 - **中英双语界面**——设置里即时切换
+
+## 快速上手（5 分钟）
+
+所有下载都在一个页面：**[Releases · latest](https://github.com/genli-ai/MicType/releases/latest)**
+
+| | 🍎 macOS（Apple Silicon，macOS 15+） | 🪟 Windows（Win10 22H2+/11，x64，公测） |
+|---|---|---|
+| **1. 下载运行** | `MicType-{版本}-arm64.zip` → 解压 → 把 `MicType.app` 拖进应用程序。被拦时：系统设置 → 隐私与安全性 → **「仍要打开」** | `MicType-{版本}-win-x64.zip` → 解压 → 运行 `MicType.exe`。SmartScreen 拦截点 **「更多信息 → 仍要运行」** |
+| **2. 一次性设置** | 允许**麦克风**；开启**辅助功能**（系统设置 → 隐私与安全性）；设置 → 识别 里下载识别模型（约 860MB） | 右键托盘图标 → 设置 → 下载识别模型（约 250MB） |
+| **3. 开口说话** | **轻点右 Option（⌥）**→ 说话 → 再点一下，文字出现在光标处 | **轻点右 Ctrl** → 说话 → 再点一下，文字出现在光标处 |
+
+语音识别 100% 本地运行，录音绝不上传。可选：在设置里配 GPT/DeepSeek 的 API Key，解锁 AI 润色和**按住说指令**（改写选中文字 / 代拟回复 / 随口提问）。升级：设置 → 关于 → **检查更新**。
 
 ## 安装
 
