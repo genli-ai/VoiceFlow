@@ -1,6 +1,5 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Threading;
 using MicType.Win.Core;
 
 namespace MicType.Win.Services;
@@ -8,85 +7,274 @@ namespace MicType.Win.Services;
 public enum InsertOutcome
 {
     Pasted,
-    ClipboardOnly
+    ClipboardOnly,
+    Timeout,
+    Error
 }
+
+public sealed record InsertResult(InsertOutcome Outcome, bool ClipboardReady, string? Error = null);
 
 public static class TextInserter
 {
+    private static readonly StaWorker Worker = new("MicType Clipboard STA");
+    private static readonly TimeSpan InsertTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ClipboardTimeout = TimeSpan.FromMilliseconds(750);
+
     public static IntPtr CaptureForegroundWindow() => GetForegroundWindow();
 
-    public static async Task<InsertOutcome> InsertAsync(
+    public static async Task<InsertResult> InsertAsync(
         string text,
         IntPtr targetWindow,
+        string? targetProcessName = null,
         bool allowClipboardRestore = true,
         bool conservativePaste = false)
     {
-        if (targetWindow != IntPtr.Zero && GetForegroundWindow() != targetWindow)
+        Log.Info(
+            "Insert begin " +
+            $"targetWindow=0x{targetWindow.ToInt64():X} targetProcess={targetProcessName ?? "unknown"} chars={text.Length}");
+
+        var operation = Worker.InvokeAsync(() =>
+            InsertCore(text, targetWindow, targetProcessName, allowClipboardRestore, conservativePaste));
+        var completed = await Task.WhenAny(operation, Task.Delay(InsertTimeout));
+        if (completed == operation)
         {
-            Log.Info($"Insert target window is not foreground; attempting focus target=0x{targetWindow.ToInt64():X}");
-            SetForegroundWindow(targetWindow);
-            await Task.Delay(conservativePaste ? 750 : 250);
+            return await operation;
         }
 
-        if (targetWindow != IntPtr.Zero && GetForegroundWindow() != targetWindow)
-        {
-            Log.Warn($"Insert fallback to clipboard; foreground did not return to target=0x{targetWindow.ToInt64():X}");
-            SetClipboardText(text);
-            return InsertOutcome.ClipboardOnly;
-        }
-
-        var oldText = GetClipboardText();
-        SetClipboardText(text);
-        await Task.Delay(conservativePaste ? 350 : 180);
-        SendCtrlV(conservativePaste ? 120 : 30);
-
-        if (allowClipboardRestore && SettingsStore.Instance.Current.RestoreClipboard)
-        {
-            _ = RestoreClipboardLater(text, oldText);
-        }
-
-        Log.Info($"Insert pasted chars={text.Length} restoreClipboard={allowClipboardRestore && SettingsStore.Instance.Current.RestoreClipboard}");
-        return InsertOutcome.Pasted;
+        Log.Warn("Insert timeout; paste abandoned after 5s");
+        _ = operation.ContinueWith(
+            task => Log.Error(task.Exception!, "Timed-out insert later failed"),
+            TaskContinuationOptions.OnlyOnFaulted);
+        var clipboardReady = await TrySetClipboardTextOnTemporaryStaAsync(text, TimeSpan.FromSeconds(1));
+        Log.Warn($"Insert timeout fallback clipboardReady={clipboardReady}");
+        return new InsertResult(InsertOutcome.Timeout, clipboardReady, "Insert timed out");
     }
 
-    public static void SetClipboardText(string text)
+    public static async Task<bool> SetClipboardTextAsync(string text)
     {
-        Application.Current.Dispatcher.Invoke(() => Clipboard.SetText(text));
+        var result = await Worker.InvokeAsync(() => TrySetClipboardText(text, ClipboardTimeout));
+        Log.Info($"Clipboard write text chars={text.Length} ok={result}");
+        return result;
     }
 
-    public static string? GetClipboardText()
+    public static Task<string?> GetClipboardTextAsync()
     {
-        return Application.Current.Dispatcher.Invoke(() =>
-            Clipboard.ContainsText() ? Clipboard.GetText() : null);
+        return Worker.InvokeAsync(() => TryGetClipboardText(ClipboardTimeout));
     }
 
-    private static async Task RestoreClipboardLater(string ourText, string? oldText)
+    public static async Task<bool> ClearClipboardAsync()
     {
-        await Task.Delay(TimeSpan.FromSeconds(5));
-        Application.Current.Dispatcher.Invoke(() =>
+        var result = await Worker.InvokeAsync(() => TrySetClipboardText(null, ClipboardTimeout));
+        Log.Info($"Clipboard clear ok={result}");
+        return result;
+    }
+
+    internal static void SendCtrlC()
+    {
+        Worker.Post(() =>
         {
-            if (!Clipboard.ContainsText() || Clipboard.GetText() != ourText) return;
-            if (oldText is null)
+            Log.Info("SendInput Ctrl+C");
+            SendModifiedKey(0x11, 0x43, 30);
+        });
+    }
+
+    private static InsertResult InsertCore(
+        string text,
+        IntPtr targetWindow,
+        string? targetProcessName,
+        bool allowClipboardRestore,
+        bool conservativePaste)
+    {
+        try
+        {
+            if (targetWindow != IntPtr.Zero && GetForegroundWindow() != targetWindow)
             {
-                Clipboard.Clear();
-                Log.Info("Clipboard restored by clearing MicType text");
+                Log.Info(
+                    "Insert focus switch " +
+                    $"targetWindow=0x{targetWindow.ToInt64():X} targetProcess={targetProcessName ?? "unknown"}");
+                var focused = SetForegroundWindow(targetWindow);
+                Log.Info($"Insert focus SetForegroundWindow result={focused}");
+                Thread.Sleep(conservativePaste ? 750 : 250);
             }
-            else
+
+            var oldText = TryGetClipboardText(ClipboardTimeout);
+            var clipboardReady = TrySetClipboardText(text, ClipboardTimeout);
+            Log.Info($"Insert clipboard write result={clipboardReady} chars={text.Length}");
+            if (!clipboardReady)
             {
-                Clipboard.SetText(oldText);
-                Log.Info("Clipboard restored to previous text");
+                return new InsertResult(InsertOutcome.Error, ClipboardReady: false, Error: "Could not write clipboard");
             }
-        }, DispatcherPriority.Background);
+
+            if (targetWindow != IntPtr.Zero && GetForegroundWindow() != targetWindow)
+            {
+                Log.Warn($"Insert clipboard fallback; foreground did not return to target=0x{targetWindow.ToInt64():X}");
+                return new InsertResult(InsertOutcome.ClipboardOnly, ClipboardReady: true);
+            }
+
+            Thread.Sleep(conservativePaste ? 350 : 180);
+            Log.Info("Insert SendInput Ctrl+V");
+            SendCtrlV(conservativePaste ? 120 : 30);
+
+            if (allowClipboardRestore && SettingsStore.Instance.Current.RestoreClipboard)
+            {
+                ScheduleClipboardRestore(text, oldText);
+            }
+
+            Log.Info($"Insert end outcome=Pasted chars={text.Length}");
+            return new InsertResult(InsertOutcome.Pasted, ClipboardReady: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Insert failed");
+            return new InsertResult(InsertOutcome.Error, ClipboardReady: false, Error: ex.Message);
+        }
+    }
+
+    private static void ScheduleClipboardRestore(string ourText, string? oldText)
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            await Worker.InvokeAsync(() =>
+            {
+                var current = TryGetClipboardText(ClipboardTimeout);
+                if (current != ourText) return;
+
+                var restored = TrySetClipboardText(oldText, ClipboardTimeout);
+                Log.Info(oldText is null
+                    ? $"Clipboard restored by clearing MicType text ok={restored}"
+                    : $"Clipboard restored to previous text ok={restored}");
+            });
+        });
+    }
+
+    private static bool TrySetClipboardText(string? text, TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        do
+        {
+            if (OpenClipboard(IntPtr.Zero))
+            {
+                try
+                {
+                    EmptyClipboard();
+                    if (text is null)
+                    {
+                        return true;
+                    }
+
+                    var bytes = (text.Length + 1) * 2;
+                    var handle = GlobalAlloc(GmemMoveable, (UIntPtr)bytes);
+                    if (handle == IntPtr.Zero) return false;
+
+                    var locked = GlobalLock(handle);
+                    if (locked == IntPtr.Zero)
+                    {
+                        GlobalFree(handle);
+                        return false;
+                    }
+
+                    try
+                    {
+                        Marshal.Copy(text.ToCharArray(), 0, locked, text.Length);
+                        Marshal.WriteInt16(locked, text.Length * 2, 0);
+                    }
+                    finally
+                    {
+                        GlobalUnlock(handle);
+                    }
+
+                    if (SetClipboardData(CfUnicodeText, handle) == IntPtr.Zero)
+                    {
+                        GlobalFree(handle);
+                        return false;
+                    }
+
+                    return true;
+                }
+                finally
+                {
+                    CloseClipboard();
+                }
+            }
+
+            Thread.Sleep(35);
+        } while (DateTimeOffset.UtcNow < deadline);
+
+        Log.Warn("Clipboard write timed out waiting for OpenClipboard");
+        return false;
+    }
+
+    private static async Task<bool> TrySetClipboardTextOnTemporaryStaAsync(string text, TimeSpan timeout)
+    {
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                tcs.SetResult(TrySetClipboardText(text, timeout));
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "MicType Clipboard Timeout Fallback"
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+
+        var completed = await Task.WhenAny(tcs.Task, Task.Delay(timeout + TimeSpan.FromMilliseconds(250)));
+        if (completed != tcs.Task)
+        {
+            Log.Warn("Temporary STA clipboard write timed out");
+            return false;
+        }
+
+        return await tcs.Task;
+    }
+
+    private static string? TryGetClipboardText(TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        do
+        {
+            if (OpenClipboard(IntPtr.Zero))
+            {
+                try
+                {
+                    if (!IsClipboardFormatAvailable(CfUnicodeText)) return null;
+                    var handle = GetClipboardData(CfUnicodeText);
+                    if (handle == IntPtr.Zero) return null;
+                    var locked = GlobalLock(handle);
+                    if (locked == IntPtr.Zero) return null;
+                    try
+                    {
+                        return Marshal.PtrToStringUni(locked);
+                    }
+                    finally
+                    {
+                        GlobalUnlock(handle);
+                    }
+                }
+                finally
+                {
+                    CloseClipboard();
+                }
+            }
+
+            Thread.Sleep(35);
+        } while (DateTimeOffset.UtcNow < deadline);
+
+        Log.Warn("Clipboard read timed out waiting for OpenClipboard");
+        return null;
     }
 
     private static void SendCtrlV(int holdMilliseconds)
     {
         SendModifiedKey(0x11, 0x56, holdMilliseconds);
-    }
-
-    internal static void SendCtrlC()
-    {
-        SendModifiedKey(0x11, 0x43, 30);
     }
 
     private static void SendModifiedKey(ushort modifier, ushort key, int holdMilliseconds)
@@ -98,7 +286,8 @@ public static class TextInserter
             KeyboardInput(key, true),
             KeyboardInput(modifier, true)
         };
-        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
+        var sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
+        Log.Info($"SendInput key=0x{key:X} sent={sent}/{inputs.Length}");
         if (holdMilliseconds > 30)
         {
             Thread.Sleep(holdMilliseconds);
@@ -127,6 +316,39 @@ public static class TextInserter
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint nInputs, Input[] pInputs, int cbSize);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool EmptyClipboard();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetClipboardData(uint uFormat);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool IsClipboardFormatAvailable(uint format);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalLock(IntPtr hMem);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GlobalUnlock(IntPtr hMem);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalFree(IntPtr hMem);
+
+    private const uint CfUnicodeText = 13;
+    private const uint GmemMoveable = 0x0002;
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Input
     {
@@ -148,5 +370,79 @@ public static class TextInserter
         public uint DwFlags;
         public uint Time;
         public IntPtr DwExtraInfo;
+    }
+
+    private sealed class StaWorker
+    {
+        private readonly BlockingCollection<Action> _queue = new();
+
+        public StaWorker(string name)
+        {
+            var thread = new Thread(Run)
+            {
+                IsBackground = true,
+                Name = name
+            };
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+        }
+
+        public Task InvokeAsync(Action action)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _queue.Add(() =>
+            {
+                try
+                {
+                    action();
+                    tcs.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+            return tcs.Task;
+        }
+
+        public Task<T> InvokeAsync<T>(Func<T> func)
+        {
+            var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _queue.Add(() =>
+            {
+                try
+                {
+                    tcs.SetResult(func());
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+            return tcs.Task;
+        }
+
+        public void Post(Action action)
+        {
+            _queue.Add(() =>
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "STA worker posted action failed");
+                }
+            });
+        }
+
+        private void Run()
+        {
+            foreach (var action in _queue.GetConsumingEnumerable())
+            {
+                action();
+            }
+        }
     }
 }

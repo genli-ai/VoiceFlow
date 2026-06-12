@@ -35,22 +35,22 @@ public partial class App : Application
         {
             IsRecording = () => _dictation?.IsRecording == true
         };
-        _hotkeys.TapToggle += () => Dispatcher.Invoke(() =>
+        _hotkeys.TapToggle += () => Dispatcher.BeginInvoke(() =>
         {
             Log.Info("Hotkey tap");
             _dictation.Toggle();
         });
-        _hotkeys.SkillStart += () => Dispatcher.Invoke(() =>
+        _hotkeys.SkillStart += () => Dispatcher.BeginInvoke(() =>
         {
             Log.Info("Hotkey hold-start");
             _dictation.SkillHoldStart();
         });
-        _hotkeys.SkillEnd += () => Dispatcher.Invoke(() =>
+        _hotkeys.SkillEnd += () => Dispatcher.BeginInvoke(() =>
         {
             Log.Info("Hotkey hold-end");
             _dictation.SkillHoldEnd();
         });
-        _hotkeys.Cancel += () => Dispatcher.Invoke(() =>
+        _hotkeys.Cancel += () => Dispatcher.BeginInvoke(() =>
         {
             Log.Info("Hotkey Esc cancel");
             _dictation.Cancel();
@@ -138,7 +138,7 @@ public partial class App : Application
             {
                 var title = item.Polished.ReplaceLineEndings(" ");
                 if (title.Length > 36) title = title[..36] + "...";
-                history.DropDownItems.Add(title, null, (_, _) => TextInserter.SetClipboardText(item.Polished));
+                history.DropDownItems.Add(title, null, (_, _) => _ = TextInserter.SetClipboardTextAsync(item.Polished));
             }
             history.DropDownItems.Add(new Forms.ToolStripSeparator());
             history.DropDownItems.Add(L10n.Tr("清空记录", "Clear History"), null, (_, _) => HistoryStore.Instance.Clear());
@@ -169,7 +169,7 @@ public partial class App : Application
 
     private void ShowSettings()
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(() =>
         {
             if (_settingsWindow is null)
             {
