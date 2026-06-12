@@ -17,8 +17,20 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private ISpeechEngine? _speechEngine;
 
+    private Mutex? _singleInstanceMutex;
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        _singleInstanceMutex = new Mutex(true, "MicTypeWindowsSingleInstance", out var isFirstInstance);
+        if (!isFirstInstance)
+        {
+            MessageBox.Show(
+                L10n.Tr("MicType 已经在运行（看系统托盘右下角）。", "MicType is already running (check the system tray)."),
+                "MicType");
+            Shutdown();
+            return;
+        }
+
         Log.Initialize();
         base.OnStartup(e);
         DispatcherUnhandledException += (_, args) =>

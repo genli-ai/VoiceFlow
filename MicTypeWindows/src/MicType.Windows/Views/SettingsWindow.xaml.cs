@@ -109,9 +109,17 @@ public partial class SettingsWindow : Window
 
     private void OnSaveSettings(object sender, RoutedEventArgs e)
     {
-        SaveUiIntoSettings();
-        SettingsStore.Instance.Save();
-        TestResultText.Text = L10n.Tr("已保存 ✓", "Saved ✓");
+        try
+        {
+            SaveUiIntoSettings();
+            SettingsStore.Instance.Save();
+            SaveStatusText.Text = L10n.Tr("已保存 ✓", "Saved ✓");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Save settings failed");
+            SaveStatusText.Text = L10n.Tr("保存失败：", "Save failed: ") + ex.Message;
+        }
     }
 
     private void OnSaveKey(object sender, RoutedEventArgs e)

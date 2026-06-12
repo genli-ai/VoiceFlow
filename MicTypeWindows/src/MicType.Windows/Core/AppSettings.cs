@@ -99,6 +99,7 @@ public sealed class SettingsStore
         Converters =
         {
             new HotkeyChoiceJsonConverter(),
+            new LenientEnumConverterFactory(),
             new JsonStringEnumConverter()
         }
     };
@@ -114,7 +115,11 @@ public sealed class SettingsStore
     {
         Directory.CreateDirectory(AppPaths.AppDataDir);
         var json = JsonSerializer.Serialize(Current, JsonOptions);
-        File.WriteAllText(AppPaths.SettingsPath, json);
+        // 原子写入：先写临时文件再替换，进程被杀或并发时不会留下半截文件
+        var tmp = AppPaths.SettingsPath + ".tmp";
+        File.WriteAllText(tmp, json);
+        File.Move(tmp, AppPaths.SettingsPath, overwrite: true);
+        Log.Info("Settings saved");
     }
 
     public void Reload()
@@ -139,7 +144,64 @@ public sealed class SettingsStore
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to load settings");
+            SelfHealCorruptFile();
             return new AppSettings();
+        }
+    }
+
+    /// 坏文件备份为 settings.corrupt.json 并写回默认——避免每次启动都解析失败、用户设置看似"保存不上"
+    private static void SelfHealCorruptFile()
+    {
+        try
+        {
+            var path = AppPaths.SettingsPath;
+            if (File.Exists(path))
+            {
+                File.Move(path, path.Replace("settings.json", "settings.corrupt.json"), overwrite: true);
+                Log.Warn("Corrupt settings backed up to settings.corrupt.json and reset to defaults");
+            }
+            File.WriteAllText(path, JsonSerializer.Serialize(new AppSettings(), JsonOptions));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Settings self-heal failed");
+        }
+    }
+}
+
+/// 宽容的枚举反序列化：无法识别的值回退枚举默认值，绝不让单个坏字段毁掉整份设置
+public sealed class LenientEnumConverterFactory : JsonConverterFactory
+{
+    public override bool CanConvert(Type typeToConvert) => typeToConvert.IsEnum;
+
+    public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
+    {
+        return (JsonConverter)Activator.CreateInstance(
+            typeof(LenientEnumConverter<>).MakeGenericType(typeToConvert))!;
+    }
+
+    private sealed class LenientEnumConverter<T> : JsonConverter<T> where T : struct, Enum
+    {
+        public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.String &&
+                Enum.TryParse<T>(reader.GetString(), ignoreCase: true, out var parsed) &&
+                Enum.IsDefined(parsed))
+            {
+                return parsed;
+            }
+            if (reader.TokenType == JsonTokenType.Number &&
+                reader.TryGetInt32(out var number) &&
+                Enum.IsDefined((T)Enum.ToObject(typeof(T), number)))
+            {
+                return (T)Enum.ToObject(typeof(T), number);
+            }
+            return default;
+        }
+
+        public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+        {
+            writer.WriteStringValue(value.ToString());
         }
     }
 }

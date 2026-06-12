@@ -95,6 +95,12 @@
                 </StackPanel>
             </TabItem>
         </TabControl>
+        <TextBlock x:Name="SaveStatusText"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,136,9"
+                   FontWeight="SemiBold"
+                   Foreground="Green" />
         <Button x:Name="SaveButton"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
