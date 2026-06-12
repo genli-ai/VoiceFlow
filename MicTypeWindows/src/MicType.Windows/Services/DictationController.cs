@@ -310,6 +310,20 @@ public sealed class DictationController
 
     private async Task DeliverAsync(string raw, string finalText, string note, bool warning = false)
     {
+        // 托盘启动（无目标窗口）且此刻前台仍是任务栏/自己：粘贴必然落空，
+        // 诚实地走"已复制"提示，而不是发一个没人接收的 Ctrl+V 然后误报"已输入"
+        if (_targetWindow == IntPtr.Zero)
+        {
+            var fgName = GetProcessNameForWindow(TextInserter.CaptureForegroundWindow());
+            if (fgName is null or "explorer" or "MicType")
+            {
+                Log.Info($"Deliver foreground is {fgName ?? "unknown"} — no paste target, clipboard only");
+                CopyToClipboard(raw, finalText,
+                    L10n.Tr("结果已复制——点到输入框按 Ctrl+V", "Copied — click the input field and press Ctrl+V"));
+                return;
+            }
+        }
+
         var text = TextPostProcessor.ApplyVocabReplacements(TextPostProcessor.FixMixedPunctuation(finalText));
         _pendingDeliverText = text;
         Log.Info($"Deliver enter rawChars={raw.Length} finalChars={text.Length} targetProcess={_targetProcessName ?? "unknown"}");
