@@ -85,6 +85,9 @@ public partial class SettingsWindow : Window
             "Windows 版目标：右 Ctrl 轻点语音输入，长按说指令；录音和本地识别不上传；文本可按你的 GPT / DeepSeek API 润色或执行指令。\n\n当前版本使用 sherpa-onnx + SenseVoice 本地识别。",
             "Windows goal: tap Right Ctrl to dictate, hold it to command AI. Audio and local recognition stay on device; text can be polished or executed through your GPT / DeepSeek API.\n\nThis build uses local sherpa-onnx + SenseVoice recognition.");
         SaveButton.Content = L10n.Tr("保存设置", "Save Settings");
+        VersionText.Text = L10n.Tr("版本 ", "Version ") + UpdateChecker.CurrentVersion + " · sherpa-onnx SenseVoice";
+        CheckUpdateButton.Content = L10n.Tr("检查更新", "Check for Updates");
+        ReleasesButton.Content = L10n.Tr("发布页", "Releases");
         ApplyModelState(_modelDownloader.CurrentState);
     }
 
@@ -105,6 +108,37 @@ public partial class SettingsWindow : Window
         SaveUiIntoSettings();
         LoadProviderFields();
         TestResultText.Text = "";
+    }
+
+    private async void OnCheckUpdate(object sender, RoutedEventArgs e)
+    {
+        CheckUpdateButton.IsEnabled = false;
+        UpdateStatusText.Text = L10n.Tr("正在检查 GitHub 上的最新版本…", "Checking the latest release on GitHub…");
+        try
+        {
+            var result = await UpdateChecker.CheckAndDownloadAsync();
+            UpdateStatusText.Text = result.Outcome switch
+            {
+                UpdateChecker.CheckOutcome.UpToDate =>
+                    L10n.Tr($"已是最新版本（{result.Version}）", $"You're up to date ({result.Version})"),
+                UpdateChecker.CheckOutcome.Downloaded =>
+                    L10n.Tr($"新版本 {result.Version} 已下载到「下载」文件夹（已在资源管理器中选中）——退出 MicType，解压并替换 MicType.exe，重新打开即完成升级",
+                            $"Version {result.Version} downloaded to your Downloads folder (revealed in Explorer) — quit MicType, unzip and replace MicType.exe, then relaunch"),
+                UpdateChecker.CheckOutcome.NoWindowsAsset =>
+                    L10n.Tr($"最新发布（{result.Version}）暂无 Windows 包，当前版本即最新", $"Latest release ({result.Version}) has no Windows package yet — you're current"),
+                _ =>
+                    L10n.Tr($"检查失败：{result.Error}。可点「发布页」手动下载", $"Check failed: {result.Error}. Use the Releases button to download manually")
+            };
+        }
+        finally
+        {
+            CheckUpdateButton.IsEnabled = true;
+        }
+    }
+
+    private void OnOpenReleases(object sender, RoutedEventArgs e)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(UpdateChecker.ReleasesPage) { UseShellExecute = true });
     }
 
     private void OnSaveSettings(object sender, RoutedEventArgs e)

@@ -1,0 +1,47 @@
+name: Windows Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish (win-x64, self-contained)
+        run: >
+          dotnet publish MicTypeWindows/src/MicType.Windows/MicType.Windows.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          Compress-Archive -Path publish/* -DestinationPath "MicType-$version-win-x64.zip"
+          echo "ZIP_NAME=MicType-$version-win-x64.zip" >> $env:GITHUB_ENV
+
+      - name: Upload to release (waits for the release to exist)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          for ($i = 1; $i -le 10; $i++) {
+            gh release upload $tag $env:ZIP_NAME --clobber
+            if ($LASTEXITCODE -eq 0) { Write-Host "Uploaded to $tag"; exit 0 }
+            Write-Host "Release $tag not ready yet (attempt $i) - waiting 30s"
+            Start-Sleep -Seconds 30
+          }
+          Write-Error "Release $tag never appeared"
+          exit 1

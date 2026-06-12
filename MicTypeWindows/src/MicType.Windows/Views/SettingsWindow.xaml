@@ -91,7 +91,13 @@
             <TabItem x:Name="AboutTab" Header="About">
                 <StackPanel Margin="16">
                     <TextBlock Text="MicType for Windows" FontSize="24" FontWeight="Bold" />
-                    <TextBlock x:Name="AboutText" TextWrapping="Wrap" Margin="0,12,0,0" />
+                    <TextBlock x:Name="VersionText" Margin="0,4,0,0" Foreground="Gray" />
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <Button x:Name="CheckUpdateButton" MinWidth="150" Height="32" Click="OnCheckUpdate" />
+                        <Button x:Name="ReleasesButton" MinWidth="110" Height="32" Margin="8,0,0,0" Click="OnOpenReleases" />
+                    </StackPanel>
+                    <TextBlock x:Name="UpdateStatusText" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="Gray" />
+                    <TextBlock x:Name="AboutText" TextWrapping="Wrap" Margin="0,14,0,0" />
                 </StackPanel>
             </TabItem>
         </TabControl>
