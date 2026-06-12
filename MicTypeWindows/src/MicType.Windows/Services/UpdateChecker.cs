@@ -41,7 +41,7 @@ public static class UpdateChecker
             var release = await Client.GetFromJsonAsync<ReleaseInfo>(LatestApi, cancellationToken);
             if (release?.TagName is null)
             {
-                return new CheckResult(CheckOutcome.Failed, CurrentVersion, Error: "Unexpected response from GitHub");
+                return await FallbackViaRedirectAsync("Unexpected response from GitHub", cancellationToken);
             }
 
             var latest = release.TagName.TrimStart('v', 'V');
@@ -60,26 +60,66 @@ public static class UpdateChecker
                 return new CheckResult(CheckOutcome.NoWindowsAsset, latest);
             }
 
-            var downloads = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var dir = Path.Combine(downloads, "Downloads");
-            Directory.CreateDirectory(dir);
-            var dest = Path.Combine(dir, asset.Name!);
-
-            await using (var remote = await Client.GetStreamAsync(asset.DownloadUrl, cancellationToken))
-            await using (var file = File.Create(dest))
-            {
-                await remote.CopyToAsync(file, cancellationToken);
-            }
-            Log.Info($"Update downloaded {asset.Name} -> Downloads");
-
-            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{dest}\"");
-            return new CheckResult(CheckOutcome.Downloaded, latest, dest);
+            return await DownloadToDownloadsAsync(new Uri(asset.DownloadUrl), asset.Name!, latest, cancellationToken);
         }
         catch (Exception ex)
         {
-            Log.Warn("Update check failed: " + ex.Message);
+            // GitHub API 匿名调用在共享出口 IP（国内常见）下极易 403 限流——换无限流的重定向探测
+            return await FallbackViaRedirectAsync(ex.Message, cancellationToken);
+        }
+    }
+
+    /// releases/latest 的 HTML 入口会 302 到 /tag/vX.Y.Z——从 Location 头解析版本，不经 API、无限流；
+    /// 资产名是发布规矩约定的，下载地址可直接构造
+    private static async Task<CheckResult> FallbackViaRedirectAsync(string apiError, CancellationToken cancellationToken)
+    {
+        Log.Warn($"Update check via API failed: {apiError} — trying redirect probe");
+        try
+        {
+            using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+            using var probe = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
+            probe.DefaultRequestHeaders.UserAgent.ParseAdd("MicType-Windows");
+            using var response = await probe.GetAsync(ReleasesPage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var location = response.Headers.Location?.ToString() ?? "";
+            var i = location.LastIndexOf("/tag/", StringComparison.Ordinal);
+            if (i < 0)
+            {
+                return new CheckResult(CheckOutcome.Failed, CurrentVersion, Error: apiError);
+            }
+
+            var latest = location[(i + 5)..].TrimStart('v', 'V');
+            Log.Info($"Update check (redirect) latest={latest} current={CurrentVersion}");
+            if (!IsNewer(latest, CurrentVersion))
+            {
+                return new CheckResult(CheckOutcome.UpToDate, CurrentVersion);
+            }
+
+            var name = $"MicType-{latest}-win-x64.zip";
+            var url = $"https://github.com/genli-ai/MicType/releases/download/v{latest}/{name}";
+            return await DownloadToDownloadsAsync(new Uri(url), name, latest, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Update redirect probe failed: " + ex.Message);
             return new CheckResult(CheckOutcome.Failed, CurrentVersion, Error: ex.Message);
         }
+    }
+
+    private static async Task<CheckResult> DownloadToDownloadsAsync(Uri uri, string name, string version, CancellationToken cancellationToken)
+    {
+        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        Directory.CreateDirectory(dir);
+        var dest = Path.Combine(dir, name);
+
+        await using (var remote = await Client.GetStreamAsync(uri, cancellationToken))
+        await using (var file = File.Create(dest))
+        {
+            await remote.CopyToAsync(file, cancellationToken);
+        }
+        Log.Info($"Update downloaded {name} -> Downloads");
+
+        System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{dest}\"");
+        return new CheckResult(CheckOutcome.Downloaded, version, dest);
     }
 
     /// 数字分段比较："3.2.13" vs "3.2.9" → true

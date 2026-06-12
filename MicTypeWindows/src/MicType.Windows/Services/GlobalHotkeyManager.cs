@@ -18,7 +18,7 @@ public sealed class GlobalHotkeyManager : IDisposable
     private IntPtr _hookId;
     private Thread? _hookThread;
     private uint _hookThreadId;
-    private readonly HashSet<int> _pressedKeys = [];
+    private bool _targetDown;
     private DateTimeOffset? _pressedAt;
     private bool _tapCandidate;
     private bool _skillActive;
@@ -103,26 +103,34 @@ public sealed class GlobalHotkeyManager : IDisposable
             return 1; // recording mode swallows Esc
         }
 
-        var target = TargetVirtualKey(SettingsStore.Instance.Current.Hotkey);
+        var choice = SettingsStore.Instance.Current.Hotkey;
+        // 兼容两类键盘事件：标准的左右分明 vkCode（VK_RCONTROL 0xA3），以及部分键盘/驱动/远程
+        // 场景下发出的通用 vkCode（VK_CONTROL 0x11）+ extended 标志（真机日志实锤：Esc 能进钩子
+        // 而右 Ctrl 永远匹配不上）。单键判定改用 GetAsyncKeyState 实时查询其他修饰键，
+        // 不再维护跨事件的按键集合——丢一次 KeyUp（UAC/锁屏/全屏期间）就会留下永久幽灵键。
+        var isTarget = MatchesTarget(vkCode, info, choice);
         if (isDown)
         {
-            var wasAlreadyDown = !_pressedKeys.Add(vkCode);
-            if (vkCode == target && !wasAlreadyDown && _pressedKeys.Count == 1)
+            if (isTarget)
             {
-                BeginTapCandidate();
+                if (!_targetDown)
+                {
+                    _targetDown = true;
+                    if (!OtherModifierDown(choice))
+                    {
+                        BeginTapCandidate();
+                    }
+                }
             }
-            else if (vkCode != target)
+            else
             {
                 CancelTapCandidate();
             }
         }
-        else if (isUp)
+        else if (isUp && isTarget)
         {
-            _pressedKeys.Remove(vkCode);
-            if (vkCode == target)
-            {
-                EndTargetKey();
-            }
+            _targetDown = false;
+            EndTargetKey();
         }
 
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
@@ -179,10 +187,33 @@ public sealed class GlobalHotkeyManager : IDisposable
         _ => 0xA3
     };
 
+    private const uint LlkhfExtended = 0x01;
+    private const uint RightShiftScanCode = 0x36;
+
+    internal static bool MatchesTarget(int vkCode, in KbdLlHookStruct info, HotkeyChoice choice) => choice switch
+    {
+        HotkeyChoice.RightShift =>
+            vkCode == 0xA1 || (vkCode == 0x10 && info.ScanCode == RightShiftScanCode),
+        _ =>
+            vkCode == 0xA3 || (vkCode == 0x11 && (info.Flags & LlkhfExtended) != 0),
+    };
+
+    /// 目标键按下时，左右 Shift/Ctrl/Alt/Win 里有没有别的键也按着（实时查询，无状态）
+    private static bool OtherModifierDown(HotkeyChoice choice)
+    {
+        var target = TargetVirtualKey(choice);
+        ReadOnlySpan<int> modifiers = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C];
+        foreach (var m in modifiers)
+        {
+            if (m != target && (GetAsyncKeyState(m) & 0x8000) != 0) return true;
+        }
+        return false;
+    }
+
     private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct KbdLlHookStruct
+    internal struct KbdLlHookStruct
     {
         public uint VkCode;
         public uint ScanCode;
@@ -230,4 +261,7 @@ public sealed class GlobalHotkeyManager : IDisposable
 
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
 }

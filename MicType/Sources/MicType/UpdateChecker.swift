@@ -26,15 +26,15 @@ enum UpdateChecker {
 
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
-                Log.warn("Update check failed: \(error.localizedDescription)")
-                finish(.failed(error.localizedDescription))
+                fallbackViaRedirect(apiError: error.localizedDescription, finish: finish)
                 return
             }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let tag = json["tag_name"] as? String else {
-                Log.warn("Update check: unexpected response")
-                finish(.failed(tr("GitHub 返回了无法解析的内容", "Unexpected response from GitHub")))
+                // GitHub API 匿名调用在共享出口 IP（国内常见）下极易 403 限流——换无限流的重定向探测
+                fallbackViaRedirect(apiError: tr("GitHub API 返回异常（可能是限流）", "Unexpected API response (possibly rate-limited)"),
+                                    finish: finish)
                 return
             }
 
@@ -84,6 +84,47 @@ enum UpdateChecker {
                 finish(.failed(error.localizedDescription))
             }
         }.resume()
+    }
+
+    /// API 失败时的兜底：releases/latest 的网页入口会 302 到 /tag/vX.Y.Z——
+    /// 从 Location 头解析版本（不经 API、无限流），下载地址按发布命名规矩直接构造
+    private static func fallbackViaRedirect(apiError: String, finish: @escaping (CheckResult) -> Void) {
+        Log.warn("Update check via API failed: \(apiError) — trying redirect probe")
+        let delegate = NoRedirectDelegate()
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+        var request = URLRequest(url: releasesPage, timeoutInterval: 15)
+        request.httpMethod = "HEAD"
+        session.dataTask(with: request) { _, response, _ in
+            defer { session.finishTasksAndInvalidate() }
+            guard let http = response as? HTTPURLResponse,
+                  let location = http.value(forHTTPHeaderField: "Location"),
+                  let range = location.range(of: "/tag/", options: .backwards) else {
+                finish(.failed(apiError))
+                return
+            }
+            var latest = String(location[range.upperBound...])
+            if latest.hasPrefix("v") || latest.hasPrefix("V") { latest.removeFirst() }
+            Log.info("Update check (redirect) latest=\(latest) current=\(currentVersion)")
+            guard isNewer(latest, than: currentVersion) else {
+                finish(.upToDate(currentVersion))
+                return
+            }
+            let name = "MicType-\(latest)-arm64.zip"
+            guard let url = URL(string: "https://github.com/genli-ai/MicType/releases/download/v\(latest)/\(name)") else {
+                finish(.failed(apiError))
+                return
+            }
+            downloadAsset(url, named: name, version: latest, finish: finish)
+        }.resume()
+    }
+
+    private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
+        func urlSession(_ session: URLSession, task: URLSessionTask,
+                        willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest,
+                        completionHandler: @escaping (URLRequest?) -> Void) {
+            completionHandler(nil)
+        }
     }
 
     /// 数字分段比较："3.2.12" vs "3.2.9" → true
