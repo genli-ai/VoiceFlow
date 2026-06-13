@@ -188,6 +188,17 @@ final class DictationController {
                 // 指令模式：这次说的话就是命令。普通输入永远不做指令解析。
                 if self.skillSession {
                     self.skillSession = false
+                    // 指令模式要跑 LLM。没配 API Key 时，明确提示用户「轻点」做纯语音输入（无需 Key），
+                    // 而不是长按——长按进的是需要 Key 的指令模式。教用户用对手势，不做剪贴板兜底。
+                    if KeychainHelper.loadAPIKey() == nil {
+                        let keyName = Settings.shared.hotkey.displayName
+                        self.phase = .idle
+                        self.overlay.flashError(
+                            tr("指令模式需配置 API Key；纯语音输入请「轻点」\(keyName)（而非长按）",
+                               "Command mode needs an API key. For dictation, tap \(keyName) (don't hold)"))
+                        Sounds.playError()
+                        return
+                    }
                     self.runSkillSession(rawText: rawText, isColdStart: isColdStart)
                     return
                 }
