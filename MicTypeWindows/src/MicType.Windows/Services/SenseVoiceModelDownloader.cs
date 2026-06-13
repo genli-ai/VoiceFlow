@@ -122,7 +122,7 @@ public sealed class SenseVoiceModelDownloader
 
                 Publish(true, null, L10n.Tr("正在解压模型…", "Extracting model..."));
                 Log.Info("SenseVoice extracting archive");
-                ExtractArchive(archivePath, stagingDir);
+                await Task.Run(() => ExtractArchive(archivePath, stagingDir));
 
                 if (!SenseVoiceModelPaths.IsAvailable(stagingDir))
                 {
@@ -131,7 +131,7 @@ public sealed class SenseVoiceModelDownloader
                 }
 
                 Publish(true, null, L10n.Tr("正在安装模型…", "Installing model..."));
-                ReplaceModelDirectory(stagingDir, ModelDirectory);
+                await Task.Run(() => ReplaceModelDirectory(stagingDir, ModelDirectory));
                 Log.Info("SenseVoice model installed");
                 Publish(false, null, L10n.Tr("SenseVoice 模型已就绪", "SenseVoice model ready"));
             }
