@@ -1,5 +1,7 @@
 .DS_Store
 build.log
+# 本地私有开发手册（给 Claude 看，勿上传）
+/CLAUDE.md
 MicType/.build/
 MicType/dist/
 MicType/Frameworks/
