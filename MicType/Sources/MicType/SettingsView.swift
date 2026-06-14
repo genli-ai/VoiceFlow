@@ -562,9 +562,14 @@ private struct AboutTab: View {
             switch result {
             case .upToDate(let v):
                 updateStatus = tr("已是最新版本（\(v)）", "You're up to date (\(v))")
-            case .downloaded(let v, _):
-                updateStatus = tr("新版本 \(v) 已下载到「下载」文件夹（已在 Finder 中选中）——解压后把 MicType.app 拖进「应用程序」替换，重新打开即完成升级",
-                                  "Version \(v) downloaded to your Downloads folder (revealed in Finder) — unzip, drag MicType.app into Applications to replace, then relaunch")
+            case .downloaded(let v, let file):
+                if file.pathExtension.lowercased() == "dmg" {
+                    updateStatus = tr("新版本 \(v) 已下载到「下载」文件夹（已在 Finder 中选中）——双击打开 DMG，把 MicType.app 拖进「应用程序」替换，重新打开即完成升级",
+                                      "Version \(v) downloaded to your Downloads folder (revealed in Finder) — open the DMG, drag MicType.app into Applications to replace, then relaunch")
+                } else {
+                    updateStatus = tr("新版本 \(v) 已下载到「下载」文件夹（已在 Finder 中选中）——解压后把 MicType.app 拖进「应用程序」替换，重新打开即完成升级",
+                                      "Version \(v) downloaded to your Downloads folder (revealed in Finder) — unzip, drag MicType.app into Applications to replace, then relaunch")
+                }
             case .failed(let message):
                 updateStatus = tr("检查失败：\(message)。可点「发布页」手动下载",
                                   "Check failed: \(message). Use the Releases button to download manually")

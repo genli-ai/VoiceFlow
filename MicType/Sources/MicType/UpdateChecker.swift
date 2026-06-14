@@ -1,12 +1,13 @@
 import AppKit
 
-/// 轻量更新检查：查 GitHub Releases latest → 比版本 → 下载 zip 到「下载」文件夹并在 Finder 选中。
+/// 轻量更新检查：查 GitHub Releases latest → 比版本 → 下载安装包到「下载」文件夹并在 Finder 选中。
+/// 优先下载公证过的 DMG（应用内更新也零警告）；没有 DMG 时回退 Developer ID 签名的 zip。
 /// 不做自动替换（完整自更新留给 Sparkle 阶段），用户拖一下即完成升级。
 enum UpdateChecker {
 
     enum CheckResult {
         case upToDate(String)               // 已是最新（当前版本号）
-        case downloaded(String, URL)        // 新版本号、已下载的 zip 路径
+        case downloaded(String, URL)        // 新版本号、已下载的安装包路径（dmg 或 zip）
         case failed(String)                 // 用户可读的失败原因
     }
 
@@ -45,12 +46,16 @@ enum UpdateChecker {
                 return
             }
 
-            guard let assets = json["assets"] as? [[String: Any]],
-                  let asset = assets.first(where: { ($0["name"] as? String)?.hasSuffix("-arm64.zip") == true }),
+            // 优先公证过的 DMG（应用内更新也零警告），没有再回退 Developer ID 签名的 zip
+            let assets = (json["assets"] as? [[String: Any]]) ?? []
+            let pick: (String) -> [String: Any]? = { suffix in
+                assets.first { ($0["name"] as? String)?.hasSuffix(suffix) == true }
+            }
+            guard let asset = pick("-arm64.dmg") ?? pick("-arm64.zip"),
                   let urlString = asset["browser_download_url"] as? String,
                   let assetName = asset["name"] as? String,
                   let downloadURL = URL(string: urlString) else {
-                finish(.failed(tr("新版本没有可下载的 zip 包", "The new release has no downloadable zip")))
+                finish(.failed(tr("新版本没有可下载的安装包", "The new release has no downloadable installer")))
                 return
             }
 
@@ -109,6 +114,8 @@ enum UpdateChecker {
                 finish(.upToDate(currentVersion))
                 return
             }
+            // 兜底路径（API 被限流时走这里）拿不到资产清单，无法确认 DMG 是否存在——
+            // 非公证版本没有 DMG，而 zip 每个版本都有，这里稳妥用 zip；主路径才优先 DMG。
             let name = "MicType-\(latest)-arm64.zip"
             guard let url = URL(string: "https://github.com/genli-ai/MicType/releases/download/v\(latest)/\(name)") else {
                 finish(.failed(apiError))
